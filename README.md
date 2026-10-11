@@ -44,6 +44,35 @@ Everything is stored in a local database on the device and works offline. Record
 
 A Java (Spring Boot, PostgreSQL) backend is planned for later phases.
 
+## Running the app
+
+Requires Node.js 20.19 or newer (developed on Node 24) and, for Android, the Expo Go app on a phone connected to the same Wi-Fi as the computer.
+
+```bash
+npm install
+npx expo start
+```
+
+Then scan the QR code with Expo Go to open the app on Android, or press `w` to open it in the browser.
+
+| Command | What it does |
+|---|---|
+| `npm start` | Starts the development server |
+| `npm run web` | Starts it and opens the browser version |
+| `npm test` | Runs the unit tests |
+| `npm run typecheck` | Checks types |
+| `npm run lint` | Runs the linter |
+| `npm run export:web` | Builds the static web version into `dist/` |
+
+Install new packages with `npx expo install <package>` so the versions match the Expo SDK.
+
+## Project layout
+
+- `src/app/` — one file per screen (Expo Router); `_layout.tsx` loads fonts and the tab bar.
+- `src/components/` — shared pieces: screen wrapper, card, button, text, tab bar.
+- `src/constants/theme.ts` — colours, fonts, spacing and radii from the mockups.
+- `src/lib/` — plain logic with unit tests.
+
 ## Status
 
-Planning is complete and development has not started. Setup and run instructions will be added once the project is scaffolded.
+Step 1 of 9 (setup) is done: the app opens with four empty tabs (Home, Food, Weight, Settings) in the mockup styling. No features are built yet.
