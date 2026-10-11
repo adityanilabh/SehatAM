@@ -35,13 +35,22 @@ let opening: Promise<AppDb> | null = null;
 function openAppDb(): Promise<AppDb> {
   opening ??= (async () => {
     const sqlite = await SQLite.openDatabaseAsync(DATABASE_NAME);
+    // SQLite allows one transaction at a time on a connection. Two writes started
+    // close together (a double tap, or a save on blur and on a button press) would
+    // otherwise fail with "cannot start a transaction within a transaction", so
+    // transactions wait their turn.
+    let lastTransaction: Promise<unknown> = Promise.resolve();
     const db: AppDb = {
       runAsync: (source: string, params: SqlParams) => sqlite.runAsync(source, params),
       getAllAsync: <T,>(source: string, params: SqlParams) => sqlite.getAllAsync<T>(source, params),
       getFirstAsync: <T,>(source: string, params: SqlParams = []) =>
         sqlite.getFirstAsync<T>(source, params),
       execAsync: (source) => sqlite.execAsync(source),
-      withTransactionAsync: (task) => sqlite.withTransactionAsync(task),
+      withTransactionAsync: (task) => {
+        const run = lastTransaction.then(() => sqlite.withTransactionAsync(task));
+        lastTransaction = run.catch(() => undefined);
+        return run;
+      },
     };
     await prepareDb(db);
     return db;

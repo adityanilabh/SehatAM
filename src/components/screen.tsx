@@ -1,5 +1,5 @@
 import { type ReactNode } from 'react';
-import { KeyboardAvoidingView, ScrollView, StyleSheet, View } from 'react-native';
+import { KeyboardAvoidingView, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppText } from './app-text';
@@ -18,11 +18,21 @@ export type ScreenProps = {
   header?: ReactNode;
   /** Stays pinned above the tab bar, and above the keyboard when it is open. */
   footer?: ReactNode;
+  /** Enables pull-to-refresh on phones, and runs when the page is pulled down. */
+  onRefresh?: () => void;
   children?: ReactNode;
 };
 
 /** Page wrapper: ground colour, safe area, header, and room for the floating tab bar. */
-export function Screen({ title, eyebrow, headerRight, header, footer, children }: ScreenProps) {
+export function Screen({
+  title,
+  eyebrow,
+  headerRight,
+  header,
+  footer,
+  onRefresh,
+  children,
+}: ScreenProps) {
   const insets = useSafeAreaInsets();
   const keyboardVisible = useKeyboardVisible();
   // The tab bar floats over the page, so leave room for it. The keyboard covers
@@ -37,7 +47,13 @@ export function Screen({ title, eyebrow, headerRight, header, footer, children }
         <ScrollView
           style={styles.fill}
           contentContainerStyle={styles.scroll}
-          keyboardShouldPersistTaps="handled">
+          keyboardShouldPersistTaps="handled"
+          refreshControl={
+            onRefresh ? (
+              // The refresh is instant, so the spinner never needs to stay.
+              <RefreshControl refreshing={false} onRefresh={onRefresh} tintColor={Colors.accent} />
+            ) : undefined
+          }>
           <View style={styles.column}>
             {header ?? (
               <View style={styles.header}>

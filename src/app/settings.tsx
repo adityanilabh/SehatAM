@@ -3,6 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import { AppText } from '@/components/app-text';
 import { confirm, notify } from '@/components/confirm';
 import { Screen } from '@/components/screen';
+import { Segmented } from '@/components/segmented';
 import {
   ActionRow,
   NumberSetting,
@@ -19,7 +20,13 @@ import { isValidWeight } from '@/db/weight';
 import { pickBackupFile, saveBackupFile } from '@/lib/backup-file';
 import { friendlyTime, logDateFor } from '@/lib/day';
 import { shiftClockTime } from '@/lib/reminders';
-import { parseKg } from '@/lib/weight-stats';
+import {
+  formatWeight,
+  parseNumber,
+  toKg,
+  WEIGHT_UNITS,
+  type WeightUnit,
+} from '@/lib/weight-unit';
 import {
   ensureReminderPermission,
   remindersSupported,
@@ -37,10 +44,13 @@ function parseCalories(text: string): number | null | undefined {
   return Number.isInteger(value) && value >= 500 && value <= 10000 ? value : undefined;
 }
 
-function parseTargetWeight(text: string): number | null | undefined {
+/** Reads a target weight typed in the chosen unit and returns it in kilograms. */
+function parseTargetWeight(text: string, unit: WeightUnit): number | null | undefined {
   if (text.trim() === '') return null;
-  const value = parseKg(text);
-  return value !== null && isValidWeight(value) ? Math.round(value * 10) / 10 : undefined;
+  const typed = parseNumber(text);
+  if (typed === null) return undefined;
+  const weightKg = Math.round(toKg(typed, unit) * 100) / 100;
+  return isValidWeight(weightKg) ? weightKg : undefined;
 }
 
 export default function SettingsScreen() {
@@ -111,7 +121,7 @@ export default function SettingsScreen() {
     notify('All data deleted', 'The app is back to how it was when first installed.');
   };
 
-  const { dayStartHour } = settings;
+  const { dayStartHour, weightUnit } = settings;
 
   return (
     <Screen title="Settings">
@@ -129,17 +139,31 @@ export default function SettingsScreen() {
           unit="kcal"
           value={settings.calorieTarget}
           placeholder="None"
+          invalidHint="Enter a whole number from 500 to 10000"
           parse={parseCalories}
           onSave={(calorieTarget) => save({ calorieTarget })}
         />
         <NumberSetting
           label="Target weight"
-          unit="kg"
-          value={settings.targetWeightKg}
+          unit={weightUnit}
+          value={
+            settings.targetWeightKg === null
+              ? null
+              : Number(formatWeight(settings.targetWeightKg, weightUnit))
+          }
           placeholder="None"
-          parse={parseTargetWeight}
+          invalidHint="Enter a weight, such as 70"
+          parse={(text) => parseTargetWeight(text, weightUnit)}
           onSave={(targetWeightKg) => save({ targetWeightKg })}
         />
+        <SettingRow label="Weight unit">
+          <Segmented
+            label="Weight unit"
+            options={WEIGHT_UNITS}
+            value={weightUnit}
+            onChange={(next) => save({ weightUnit: next })}
+          />
+        </SettingRow>
         <StepperSetting
           label="Day starts at"
           hint="Earlier than this counts for the day before"

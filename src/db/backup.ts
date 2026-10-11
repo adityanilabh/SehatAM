@@ -3,6 +3,7 @@ import { getSettings, normaliseSettings, updateSettings, type Settings } from '.
 import { isValidWeight } from './weight';
 
 import { isLogDate } from '@/lib/day';
+import { isMeal } from '@/lib/meals';
 
 /**
  * Export and import. A backup is a plain JSON file holding every live entry and the
@@ -11,11 +12,14 @@ import { isLogDate } from '@/lib/day';
  */
 
 export const BACKUP_APP = 'SehatAM';
-export const BACKUP_FORMAT_VERSION = 1;
+/** Version 2 added `meal` to food rows. Version 1 files are still accepted. */
+export const BACKUP_FORMAT_VERSION = 2;
 
 type FoodBackupRow = {
   id: string;
   log_date: string;
+  /** Absent in version 1 files. */
+  meal?: string | null;
   eaten_at: string | null;
   food_text: string;
   quantity: string | null;
@@ -48,7 +52,7 @@ export type ImportResult = {
 
 export async function exportData(db: AppDb, now = new Date()): Promise<Backup> {
   const food = await db.getAllAsync<FoodBackupRow>(
-    `SELECT id, log_date, eaten_at, food_text, quantity, calories, created_at, updated_at
+    `SELECT id, log_date, meal, eaten_at, food_text, quantity, calories, created_at, updated_at
      FROM food_entry WHERE deleted_at IS NULL ORDER BY log_date, created_at`,
     []
   );
@@ -78,6 +82,7 @@ function isFoodRow(row: unknown): row is FoodBackupRow {
     isRecord(row) &&
     isText(row.id) &&
     isLogDate(row.log_date) &&
+    (row.meal === undefined || isTextOrNull(row.meal)) &&
     isTextOrNull(row.eaten_at) &&
     isText(row.food_text) &&
     isTextOrNull(row.quantity) &&
@@ -143,10 +148,12 @@ export async function importData(
     for (const row of backup.food) {
       await db.runAsync(
         `INSERT INTO food_entry
-           (id, log_date, eaten_at, food_text, quantity, calories, created_at, updated_at, deleted_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL)
+           (id, log_date, meal, eaten_at, food_text, quantity, calories, created_at, updated_at,
+            deleted_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
          ON CONFLICT (id) DO UPDATE SET
            log_date = excluded.log_date,
+           meal = excluded.meal,
            eaten_at = excluded.eaten_at,
            food_text = excluded.food_text,
            quantity = excluded.quantity,
@@ -157,6 +164,8 @@ export async function importData(
         [
           row.id,
           row.log_date,
+          // An unknown meal name (from a newer app) is dropped rather than stored.
+          isMeal(row.meal) ? row.meal : null,
           row.eaten_at,
           row.food_text,
           row.quantity,

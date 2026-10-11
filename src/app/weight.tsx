@@ -15,7 +15,8 @@ import { useDb, useDbQuery } from '@/db/provider';
 import { getFirstWeight, getRecentWeights, getWeights, type WeightEntry } from '@/db/weight';
 import { useToday } from '@/hooks/use-today';
 import { addDays, dayTitle, shortDate } from '@/lib/day';
-import { formatKg, summariseWeights } from '@/lib/weight-stats';
+import { summariseWeights } from '@/lib/weight-stats';
+import { formatWeight, formatWeightWithUnit } from '@/lib/weight-unit';
 
 const RANGES = [
   { value: 7, label: '7 days' },
@@ -46,7 +47,12 @@ export default function WeightScreen() {
     data?.start ?? null,
     settings.targetWeightKg
   );
-  const change = inRange.length > 1 ? summary.change : null;
+  const unit = settings.weightUnit;
+  // A change too small to show at one decimal place is treated as no change.
+  const change =
+    inRange.length > 1 && summary.change !== null && formatWeight(Math.abs(summary.change), unit) !== '0.0'
+      ? summary.change
+      : null;
 
   return (
     <Screen
@@ -71,21 +77,26 @@ export default function WeightScreen() {
         <Card style={styles.chartCard}>
           <View style={styles.headline}>
             <View style={styles.headlineValue}>
-              <AppText style={styles.big}>{formatKg(latest.weightKg)}</AppText>
+              <AppText style={styles.big}>{formatWeight(latest.weightKg, unit)}</AppText>
               <AppText type="caption" style={styles.unit}>
-                kg {dayTitle(latest.logDate, today) === 'Today' ? 'today' : `on ${shortDate(latest.logDate)}`}
+                {unit}{' '}
+                {dayTitle(latest.logDate, today) === 'Today'
+                  ? 'today'
+                  : `on ${shortDate(latest.logDate)}`}
               </AppText>
             </View>
-            {change !== null && change !== 0 ? (
+            {change !== null ? (
               <View
                 style={styles.badge}
-                aria-label={`${change < 0 ? 'Down' : 'Up'} ${formatKg(Math.abs(change))} kg in this period`}>
+                aria-label={`${change < 0 ? 'Down' : 'Up'} ${formatWeightWithUnit(Math.abs(change), unit)} in this period`}>
                 {change < 0 ? (
                   <ArrowDownIcon color={Colors.accent} size={14} />
                 ) : (
                   <ArrowUpIcon color={Colors.accent} size={14} />
                 )}
-                <AppText style={styles.badgeText}>{formatKg(Math.abs(change))} kg</AppText>
+                <AppText style={styles.badgeText}>
+                  {formatWeightWithUnit(Math.abs(change), unit)}
+                </AppText>
               </View>
             ) : null}
           </View>
@@ -104,15 +115,24 @@ export default function WeightScreen() {
 
       {latest ? (
         <View style={styles.stats}>
-          <Stat label="Start" value={data?.start ? `${formatKg(data.start.weightKg)} kg` : '—'} />
+          <Stat label="Start" value={data?.start ? formatWeightWithUnit(data.start.weightKg, unit) : '—'}
+          />
           <Stat
             label="Target"
-            value={settings.targetWeightKg ? `${formatKg(settings.targetWeightKg)} kg` : 'Not set'}
+            value={
+              settings.targetWeightKg
+                ? formatWeightWithUnit(settings.targetWeightKg, unit)
+                : 'Not set'
+            }
           />
           <Stat
             label="To go"
             value={
-              summary.toGo === null ? '—' : summary.reached ? 'Reached' : `${formatKg(summary.toGo)} kg`
+              summary.toGo === null
+                ? '—'
+                : summary.reached
+                  ? 'Reached'
+                  : formatWeightWithUnit(summary.toGo, unit)
             }
           />
         </View>
@@ -136,7 +156,7 @@ export default function WeightScreen() {
                   ? `Today, ${shortDate(entry.logDate).slice(4)}`
                   : shortDate(entry.logDate)}
               </AppText>
-              <AppText style={styles.rowValue}>{formatKg(entry.weightKg)} kg</AppText>
+              <AppText style={styles.rowValue}>{formatWeightWithUnit(entry.weightKg, unit)}</AppText>
             </Pressable>
           ))}
         </Card>

@@ -69,3 +69,12 @@ export function CloseIcon(props: IconProps) {
     </Icon>
   );
 }
+
+export function CalendarIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <Path d="M5 5h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z" />
+      <Path d="M3 10h18M8 3v4M16 3v4" />
+    </Icon>
+  );
+}

@@ -14,8 +14,8 @@ describe('weight log', () => {
 
   afterEach(() => db.close());
 
-  it('records a weight, rounded to one decimal place', async () => {
-    await logWeight(db, { logDate: '2026-10-12', weightKg: 74.24 });
+  it('records a weight, rounded to two decimal places', async () => {
+    await logWeight(db, { logDate: '2026-10-12', weightKg: 74.204 });
 
     const [entry] = await getWeights(db, '2026-10-01', '2026-10-31');
     expect(entry).toMatchObject({ id: 'id-1', logDate: '2026-10-12', weightKg: 74.2 });

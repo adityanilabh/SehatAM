@@ -71,5 +71,16 @@ Until the first build is run, `eas.json` is untested.
 - **Reminders are local notifications**, scheduled by the phone with fixed ids so re-scheduling replaces them. They are not offered in the browser.
 - **The history limit is one constant**, `FREE_HISTORY_DAYS` in `src/constants/limits.ts`.
 - **Calories are not shown anywhere yet.** The column and the calorie target are stored, ready for phase 2.
+- **Reminders are not loaded inside Expo Go on Android.** `expo-notifications` throws on import there, so it is loaded lazily and only where it can run. Reminders need a development or release build.
+
+## 5. Changes after first use on a phone (2026-10-12)
+
+- **Meals.** Schema version 2 adds a nullable `meal` column to `food_entry`. The meals are breakfast, lunch, evening snack and dinner, listed in `src/lib/meals.ts`; an item may have none and then shows under "Other". When adding to today, the meal for the current time of day is preselected.
+- **Backup format 2** adds `meal` to food rows. Format 1 files still import.
+- **Pounds.** Weights are always stored in kilograms; the unit (kg or lb) is a setting that only changes how weights are shown and typed. Stored weights keep two decimal places so a weight typed in pounds shows as the same number afterwards.
+- **Getting back to today.** Pulling the Food screen down returns to today on a phone. Browsers have no pull-to-refresh, so a "Back to today" button also appears whenever another day is shown.
+- **Calendar.** "Pick a date" opens a month grid. Future days cannot be chosen, and days with food logged carry a dot.
+- **Number settings have a Save button.** It appears once the value is changed, and "Saved" shows afterwards. Leaving the field still saves.
+- **Transactions wait their turn.** The database adapter queues transactions, because two writes started close together failed with "cannot start a transaction within a transaction".
 
 **Checked in a desktop browser only:** every screen was driven in headless Chrome (add, edit, delete, change day, log weight, export, delete all, import, restart). **Not checked on a phone:** keyboard behaviour around the add box and sheets, the Android share sheet and file picker, and whether reminders fire.

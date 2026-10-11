@@ -1,5 +1,5 @@
-import { useState, type ReactNode } from 'react';
-import { Pressable, StyleSheet, Switch, TextInput, View } from 'react-native';
+import { useRef, useState, type ReactNode } from 'react';
+import { Keyboard, Pressable, StyleSheet, Switch, TextInput, View } from 'react-native';
 
 import { AppText } from './app-text';
 import { Card } from './card';
@@ -24,17 +24,23 @@ type RowProps = {
   label: string;
   /** Smaller text under the label. */
   hint?: string;
+  /** Colours the hint, for an error or a confirmation. */
+  hintTone?: 'danger' | 'accent';
   last?: boolean;
   children?: ReactNode;
 };
 
 /** A label on the left with a control on the right. */
-export function SettingRow({ label, hint, last, children }: RowProps) {
+export function SettingRow({ label, hint, hintTone, last, children }: RowProps) {
   return (
     <View style={[styles.row, !last && styles.divider]}>
       <View style={styles.rowText}>
         <AppText>{label}</AppText>
-        {hint ? <AppText type="label">{hint}</AppText> : null}
+        {hint ? (
+          <AppText type="label" color={hintTone} aria-live="polite">
+            {hint}
+          </AppText>
+        ) : null}
       </View>
       {children}
     </View>
@@ -49,11 +55,16 @@ type NumberSettingProps = {
   placeholder: string;
   /** Returns the number to store, null to clear it, or undefined if the text is not valid. */
   parse: (text: string) => number | null | undefined;
+  /** Shown under the label when what was typed cannot be saved. */
+  invalidHint: string;
   onSave: (value: number | null) => void;
   last?: boolean;
 };
 
-/** A number typed straight into the row; it saves when the field loses focus. */
+/**
+ * A number typed straight into the row. A Save button appears as soon as the value
+ * is changed; leaving the field or pressing "done" on the keyboard saves as well.
+ */
 export function NumberSetting({
   label,
   hint,
@@ -61,29 +72,52 @@ export function NumberSetting({
   value,
   placeholder,
   parse,
+  invalidHint,
   onSave,
   last,
 }: NumberSettingProps) {
   const stored = value === null ? '' : String(value);
   // `draft` is only set while the user is typing; otherwise the stored value shows.
   const [draft, setDraft] = useState<string | null>(null);
+  const [status, setStatus] = useState<'idle' | 'saved' | 'invalid'>('idle');
+  const unsaved = draft !== null && draft.trim() !== stored;
+  // Pressing Save also takes focus from the field, so `commit` can run twice for
+  // the same text. This remembers what was last handled.
+  const handled = useRef<string | null>(null);
 
   const commit = () => {
-    if (draft === null) return;
-    const parsed = parse(draft);
-    if (parsed !== undefined && parsed !== value) {
-      onSave(parsed);
+    if (draft === null || handled.current === draft) return;
+    handled.current = draft;
+    if (!unsaved) {
+      setDraft(null);
+      return;
     }
+    const parsed = parse(draft);
+    if (parsed === undefined) {
+      // Keep what was typed on screen so it can be corrected.
+      setStatus('invalid');
+      return;
+    }
+    onSave(parsed);
     setDraft(null);
+    setStatus('saved');
   };
 
   return (
-    <SettingRow label={label} hint={hint} last={last}>
+    <SettingRow
+      label={label}
+      hint={status === 'invalid' ? invalidHint : status === 'saved' ? 'Saved' : hint}
+      hintTone={status === 'invalid' ? 'danger' : status === 'saved' ? 'accent' : undefined}
+      last={last}>
       <View style={styles.numberBox}>
         <TextInput
           aria-label={label}
           value={draft ?? stored}
-          onChangeText={setDraft}
+          onChangeText={(text) => {
+            handled.current = null;
+            setDraft(text);
+            setStatus('idle');
+          }}
           onBlur={commit}
           onSubmitEditing={commit}
           placeholder={placeholder}
@@ -92,9 +126,24 @@ export function NumberSetting({
           inputMode="decimal"
           returnKeyType="done"
           selectTextOnFocus
-          style={styles.numberInput}
+          style={[styles.numberInput, status === 'invalid' && styles.numberInputInvalid]}
         />
-        <AppText type="caption">{unit}</AppText>
+        {unsaved ? (
+          <Pressable
+            role="button"
+            aria-label={`Save ${label.toLowerCase()}`}
+            onPress={() => {
+              commit();
+              Keyboard.dismiss();
+            }}
+            style={({ pressed }) => [styles.saveButton, pressed && styles.pressed]}>
+            <AppText style={styles.saveText}>Save</AppText>
+          </Pressable>
+        ) : (
+          <AppText type="caption" style={styles.unit}>
+            {unit}
+          </AppText>
+        )}
       </View>
     </SettingRow>
   );
@@ -243,6 +292,26 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.bold,
     fontSize: 15,
     color: Colors.ink,
+  },
+  numberInputInvalid: {
+    borderWidth: 1.5,
+    borderColor: Colors.danger,
+  },
+  unit: {
+    minWidth: 28,
+  },
+  saveButton: {
+    minHeight: 44,
+    paddingHorizontal: 14,
+    borderRadius: Radius.pill,
+    backgroundColor: Colors.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  saveText: {
+    fontFamily: Fonts.bold,
+    fontSize: 13,
+    color: Colors.onAccent,
   },
   stepper: {
     flexDirection: 'row',

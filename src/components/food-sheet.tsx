@@ -1,13 +1,15 @@
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
+import { AppText } from './app-text';
 import { Button } from './button';
 import { confirm } from './confirm';
 import { DayStepper } from './day-stepper';
 import { Field } from './field';
+import { MealChips } from './meal-chips';
 import { Sheet } from './sheet';
 
-import { Spacing } from '@/constants/theme';
+import { Fonts, Spacing } from '@/constants/theme';
 import { deleteFood, updateFood, type FoodEntry } from '@/db/food';
 import { useDb } from '@/db/provider';
 import { parseClockTime, type LogDate } from '@/lib/day';
@@ -24,6 +26,7 @@ export function FoodSheet({ entry, today, onClose }: FoodSheetProps) {
   const [foodText, setFoodText] = useState(entry.foodText);
   const [quantity, setQuantity] = useState(entry.quantity ?? '');
   const [time, setTime] = useState(entry.eatenAt ?? '');
+  const [meal, setMeal] = useState(entry.meal);
   const [logDate, setLogDate] = useState(entry.logDate);
   const [foodError, setFoodError] = useState<string | null>(null);
   const [timeError, setTimeError] = useState<string | null>(null);
@@ -36,7 +39,7 @@ export function FoodSheet({ entry, today, onClose }: FoodSheetProps) {
     setTimeError(badTime ? 'Enter a time like 08:30, or leave it empty.' : null);
     if (badFood || badTime) return;
 
-    await updateFood(db, entry.id, { logDate, foodText, quantity, eatenAt });
+    await updateFood(db, entry.id, { logDate, foodText, meal, quantity, eatenAt });
     invalidate();
     onClose();
   };
@@ -64,6 +67,12 @@ export function FoodSheet({ entry, today, onClose }: FoodSheetProps) {
         error={foodError}
         returnKeyType="done"
       />
+      <View style={styles.mealField}>
+        <AppText type="caption" style={styles.label}>
+          Meal (optional)
+        </AppText>
+        <MealChips value={meal} onChange={setMeal} wrap />
+      </View>
       <View style={styles.row}>
         <View style={styles.half}>
           <Field
@@ -94,6 +103,12 @@ export function FoodSheet({ entry, today, onClose }: FoodSheetProps) {
 }
 
 const styles = StyleSheet.create({
+  mealField: {
+    gap: Spacing.two,
+  },
+  label: {
+    fontFamily: Fonts.semiBold,
+  },
   row: {
     flexDirection: 'row',
     gap: 12,

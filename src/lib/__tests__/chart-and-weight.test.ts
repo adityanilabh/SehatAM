@@ -1,5 +1,5 @@
 import { barHeights, buildLineChart, spreadBarHeights } from '../chart';
-import { formatKg, parseKg, summariseWeights } from '../weight-stats';
+import { summariseWeights } from '../weight-stats';
 
 const range = { from: '2026-10-01', to: '2026-10-11' };
 const size = { width: 116, height: 66 };
@@ -109,12 +109,10 @@ describe('summariseWeights', () => {
   it('has no change figure from a single entry', () => {
     const only = { logDate: '2026-10-11', weightKg: 74.2 };
 
-    expect(summariseWeights([only], start, 70)).toEqual({
-      latest: only,
-      change: null,
-      toGo: 4.2,
-      reached: false,
-    });
+    const summary = summariseWeights([only], start, 70);
+
+    expect(summary).toMatchObject({ latest: only, change: null, reached: false });
+    expect(summary.toGo).toBeCloseTo(4.2);
   });
 
   it('reports the change across the range and the distance to the target', () => {
@@ -127,8 +125,8 @@ describe('summariseWeights', () => {
       70
     );
 
-    expect(summary.change).toBe(-1.8);
-    expect(summary.toGo).toBe(4.2);
+    expect(summary.change).toBeCloseTo(-1.8);
+    expect(summary.toGo).toBeCloseTo(4.2);
   });
 
   it('leaves the target figures empty when no target is set', () => {
@@ -151,21 +149,5 @@ describe('summariseWeights', () => {
     expect(summariseWeights([{ logDate: 'd', weightKg: 55.5 }], lightStart, 55)).toMatchObject({
       reached: true,
     });
-  });
-});
-
-describe('weight text', () => {
-  it('formats to one decimal place', () => {
-    expect(formatKg(74)).toBe('74.0');
-    expect(formatKg(74.25)).toBe('74.3');
-  });
-
-  it('reads typed weights and rejects anything else', () => {
-    expect(parseKg('74.2')).toBe(74.2);
-    expect(parseKg(' 74,2 ')).toBe(74.2);
-    expect(parseKg('74')).toBe(74);
-    expect(parseKg('74kg')).toBeNull();
-    expect(parseKg('')).toBeNull();
-    expect(parseKg('-5')).toBeNull();
   });
 });

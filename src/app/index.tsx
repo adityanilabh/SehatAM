@@ -8,19 +8,20 @@ import { ChevronRightIcon, PlusIcon } from '@/components/icons';
 import { Screen } from '@/components/screen';
 import { Colors, Fonts, Radius, Shadows, Spacing } from '@/constants/theme';
 import { getFoodCountsByDay, getFoodForDay, getLoggedDates } from '@/db/food';
-import { useDbQuery } from '@/db/provider';
+import { useDb, useDbQuery } from '@/db/provider';
 import { getRecentWeights } from '@/db/weight';
 import { useToday } from '@/hooks/use-today';
 import { barHeights, spreadBarHeights } from '@/lib/chart';
 import { addDays, dateRange, longDate, shortDate, weekdayInitial } from '@/lib/day';
 import { greetingFor } from '@/lib/greeting';
 import { currentStreak } from '@/lib/streak';
-import { formatKg } from '@/lib/weight-stats';
+import { formatWeight } from '@/lib/weight-unit';
 
 const WEEK_BAR_HEIGHT = 44;
 
 export default function HomeScreen() {
   const router = useRouter();
+  const unit = useDb().settings.weightUnit;
   const today = useToday();
   const weekStart = addDays(today, -6);
 
@@ -49,8 +50,9 @@ export default function HomeScreen() {
   const weekWeights = weights.filter((entry) => entry.logDate >= weekStart);
   const weekChange =
     weekWeights.length > 1
-      ? Math.round((latestWeight!.weightKg - weekWeights[0].weightKg) * 10) / 10
+      ? latestWeight!.weightKg - weekWeights[0].weightKg
       : null;
+  const weekChangeText = weekChange === null ? '0.0' : formatWeight(Math.abs(weekChange), unit);
   const weightHeights = spreadBarHeights(
     weights.map((entry) => entry.weightKg),
     40,
@@ -97,8 +99,8 @@ export default function HomeScreen() {
             <View style={styles.smallHead}>
               <AppText style={styles.smallTitle}>Weight</AppText>
               <AppText type="label" numberOfLines={1}>
-                {weekChange !== null && weekChange !== 0
-                  ? `${weekChange < 0 ? 'Down' : 'Up'} ${formatKg(Math.abs(weekChange))} kg this week`
+                {weekChange !== null && weekChangeText !== '0.0'
+                  ? `${weekChange < 0 ? 'Down' : 'Up'} ${weekChangeText} ${unit} this week`
                   : latestWeight
                     ? `Last logged ${shortDate(latestWeight.logDate)}`
                     : 'Nothing logged yet'}
@@ -119,8 +121,10 @@ export default function HomeScreen() {
               </View>
               {latestWeight ? (
                 <View style={styles.weightValue}>
-                  <AppText style={styles.weightNumber}>{formatKg(latestWeight.weightKg)}</AppText>
-                  <AppText type="label">kg</AppText>
+                  <AppText style={styles.weightNumber}>
+                    {formatWeight(latestWeight.weightKg, unit)}
+                  </AppText>
+                  <AppText type="label">{unit}</AppText>
                 </View>
               ) : (
                 <AppText style={styles.weightNumber}>—</AppText>

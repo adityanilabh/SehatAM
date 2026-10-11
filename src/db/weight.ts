@@ -47,7 +47,8 @@ export async function logWeight(
   if (!isValidWeight(input.weightKg)) {
     throw new Error(`Weight must be between ${MIN_WEIGHT_KG} and ${MAX_WEIGHT_KG} kg.`);
   }
-  const weightKg = Math.round(input.weightKg * 10) / 10;
+  // Two decimal places, so a weight typed in pounds converts back to the same figure.
+  const weightKg = Math.round(input.weightKg * 100) / 100;
   const stamp = now.toISOString();
 
   await db.withTransactionAsync(async () => {

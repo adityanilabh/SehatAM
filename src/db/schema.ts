@@ -40,4 +40,9 @@ export const migrations: Migration[] = [
         );
       `),
   },
+  {
+    // Which meal an item belongs to (breakfast, lunch, ...). Null means not filed.
+    version: 2,
+    up: (db) => db.execAsync('ALTER TABLE food_entry ADD COLUMN meal TEXT'),
+  },
 ];

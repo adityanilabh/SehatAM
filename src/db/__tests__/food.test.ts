@@ -30,6 +30,7 @@ describe('food log', () => {
     expect(entry).toEqual({
       id: 'id-1',
       logDate: DAY,
+      meal: null,
       eatenAt: null,
       foodText: '2 roti with ghee',
       quantity: null,

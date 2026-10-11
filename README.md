@@ -9,8 +9,9 @@ Phase 1 is the app working fully on the device, with no AI, no login and no back
 ### Features
 
 - **Food log:** add an item in one line, with optional time and quantity; edit and delete.
-- **Days:** switch between days and view past ones. Each item is assigned to a day, so late-night eating can count for the previous day.
-- **Weight:** log weight when you like, with a graph (7 days and 25 days) that redraws from the entries, plus start, target and to-go figures.
+- **Meals:** file each item under breakfast, lunch, evening snack or dinner; the day's list is grouped by meal.
+- **Days:** step between days, jump to any past day from a calendar, and pull down to return to today. Each item is assigned to a day, so late-night eating can count for the previous day.
+- **Weight:** log weight in kilograms or pounds when you like, with a graph (7 days and 25 days) that redraws from the entries, plus start, target and to-go figures.
 - **Home:** today's item count, latest weight and the last few items eaten.
 - **Streaks:** consecutive days with at least one entry.
 - **Reminders:** daily reminders to log food and weight (Android).

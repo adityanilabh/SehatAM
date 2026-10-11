@@ -2,10 +2,13 @@ import { type AppDb } from './database';
 
 import { type LogDate } from '@/lib/day';
 import { newId } from '@/lib/id';
+import { isMeal, type Meal } from '@/lib/meals';
 
 export type FoodEntry = {
   id: string;
   logDate: LogDate;
+  /** Breakfast, lunch and so on, or null when the item was not filed under a meal. */
+  meal: Meal | null;
   /** `HH:MM`, or null when no time was given. */
   eatenAt: string | null;
   foodText: string;
@@ -19,6 +22,7 @@ export type FoodEntry = {
 export type FoodInput = {
   logDate: LogDate;
   foodText: string;
+  meal?: Meal | null;
   eatenAt?: string | null;
   quantity?: string | null;
 };
@@ -26,6 +30,7 @@ export type FoodInput = {
 type FoodRow = {
   id: string;
   log_date: string;
+  meal: string | null;
   eaten_at: string | null;
   food_text: string;
   quantity: string | null;
@@ -34,12 +39,14 @@ type FoodRow = {
   updated_at: string;
 };
 
-const COLUMNS = 'id, log_date, eaten_at, food_text, quantity, calories, created_at, updated_at';
+const COLUMNS =
+  'id, log_date, meal, eaten_at, food_text, quantity, calories, created_at, updated_at';
 
 function toEntry(row: FoodRow): FoodEntry {
   return {
     id: row.id,
     logDate: row.log_date,
+    meal: isMeal(row.meal) ? row.meal : null,
     eatenAt: row.eaten_at,
     foodText: row.food_text,
     quantity: row.quantity,
@@ -57,25 +64,28 @@ function clean(input: FoodInput) {
   return {
     logDate: input.logDate,
     foodText,
+    meal: input.meal ?? null,
     eatenAt: input.eatenAt?.trim() || null,
     quantity: input.quantity?.trim() || null,
   };
 }
 
 export async function addFood(db: AppDb, input: FoodInput, now = new Date()): Promise<FoodEntry> {
-  const { logDate, foodText, eatenAt, quantity } = clean(input);
+  const { logDate, foodText, meal, eatenAt, quantity } = clean(input);
   const id = newId();
   const stamp = now.toISOString();
 
   await db.runAsync(
-    `INSERT INTO food_entry (id, log_date, eaten_at, food_text, quantity, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    [id, logDate, eatenAt, foodText, quantity, stamp, stamp]
+    `INSERT INTO food_entry
+       (id, log_date, meal, eaten_at, food_text, quantity, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [id, logDate, meal, eatenAt, foodText, quantity, stamp, stamp]
   );
 
   return {
     id,
     logDate,
+    meal,
     eatenAt,
     foodText,
     quantity,
@@ -91,13 +101,13 @@ export async function updateFood(
   input: FoodInput,
   now = new Date()
 ): Promise<void> {
-  const { logDate, foodText, eatenAt, quantity } = clean(input);
+  const { logDate, foodText, meal, eatenAt, quantity } = clean(input);
 
   await db.runAsync(
     `UPDATE food_entry
-     SET log_date = ?, eaten_at = ?, food_text = ?, quantity = ?, updated_at = ?
+     SET log_date = ?, meal = ?, eaten_at = ?, food_text = ?, quantity = ?, updated_at = ?
      WHERE id = ? AND deleted_at IS NULL`,
-    [logDate, eatenAt, foodText, quantity, now.toISOString(), id]
+    [logDate, meal, eatenAt, foodText, quantity, now.toISOString(), id]
   );
 }
 

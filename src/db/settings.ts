@@ -1,11 +1,15 @@
 import { type AppDb } from './database';
 
+import { isWeightUnit, type WeightUnit } from '@/lib/weight-unit';
+
 export type Settings = {
   /** Hour (0 to 23) at which a new day begins. Before it, entries count for the day before. */
   dayStartHour: number;
   /** Daily calorie target. Stored now, shown from phase 2 when calories exist. */
   calorieTarget: number | null;
   targetWeightKg: number | null;
+  /** How weights are shown and typed. They are always stored in kilograms. */
+  weightUnit: WeightUnit;
   foodReminderEnabled: boolean;
   /** `HH:MM` */
   foodReminderTime: string;
@@ -18,6 +22,7 @@ export const DEFAULT_SETTINGS: Settings = {
   dayStartHour: 4,
   calorieTarget: null,
   targetWeightKg: null,
+  weightUnit: 'kg',
   foodReminderEnabled: false,
   foodReminderTime: '20:00',
   weightReminderEnabled: false,
@@ -75,6 +80,7 @@ export function normaliseSettings(raw: Record<string, unknown>): Settings {
         : DEFAULT_SETTINGS.dayStartHour,
     calorieTarget: positiveOrNull(raw.calorieTarget),
     targetWeightKg: positiveOrNull(raw.targetWeightKg),
+    weightUnit: isWeightUnit(raw.weightUnit) ? raw.weightUnit : DEFAULT_SETTINGS.weightUnit,
     foodReminderEnabled: raw.foodReminderEnabled === true,
     foodReminderTime: isTime(raw.foodReminderTime)
       ? raw.foodReminderTime
