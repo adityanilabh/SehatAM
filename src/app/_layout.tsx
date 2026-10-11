@@ -10,6 +10,7 @@ import { useEffect } from 'react';
 
 import AppTabs from '@/components/app-tabs';
 import { Colors } from '@/constants/theme';
+import { DbProvider } from '@/db/provider';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -39,7 +40,9 @@ export default function RootLayout() {
   return (
     <ThemeProvider value={theme}>
       <StatusBar style="dark" />
-      <AppTabs />
+      <DbProvider>
+        <AppTabs />
+      </DbProvider>
     </ThemeProvider>
   );
 }
