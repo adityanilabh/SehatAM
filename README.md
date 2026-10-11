@@ -1,4 +1,4 @@
-# NyayMitra
+# SehatAM
 
 A fitness app for logging what you eat and tracking your weight. It is being built as an MVP in phases; this README covers phase 1.
 

@@ -88,7 +88,7 @@ describe('migrate', () => {
 
 describe('migrate, across app restarts', () => {
   it('upgrades a database file left by the previous release', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'nyaymitra-migrate-'));
+    const dir = mkdtempSync(join(tmpdir(), 'sehatam-migrate-'));
     const file = join(dir, 'app.db');
 
     try {

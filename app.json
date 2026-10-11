@@ -1,13 +1,14 @@
 {
   "expo": {
-    "name": "NyayMitra",
-    "slug": "nyaymitra",
+    "name": "SehatAM",
+    "slug": "sehatam",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "nyaymitra",
+    "scheme": "sehatam",
     "userInterfaceStyle": "light",
     "android": {
+      "package": "com.adityanilabh.SehatAM",
       "adaptiveIcon": {
         "backgroundColor": "#EEF1F6",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

@@ -49,9 +49,10 @@ Decisions from the phase 1 spikes (step 2), with what was tested. Add new decisi
 
 **Not yet done (needs the account owner):**
 
-1. Choose the Android package name, for example `com.<yourname>.<appname>`. It is permanent once the app is on the Play Store.
-2. Create or log in to an Expo account: `npx eas-cli@latest login`.
-3. Run the first build: `npx eas-cli@latest build --profile preview --platform android`. This creates the keystore and confirms `eas.json` works.
-4. Back up the keystore with `npx eas-cli@latest credentials`.
+1. Create or log in to an Expo account: `npx eas-cli@latest login`.
+2. Run the first build: `npx eas-cli@latest build --profile preview --platform android`. This creates the keystore and confirms `eas.json` works.
+3. Back up the keystore with `npx eas-cli@latest credentials`.
 
-Until step 3 is run, `eas.json` is untested.
+Until the first build is run, `eas.json` is untested.
+
+**Package name (chosen 2026-10-12):** `com.adityanilabh.SehatAM`, set in `app.json`. It becomes permanent once the app is published on the Play Store.
