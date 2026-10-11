@@ -134,7 +134,7 @@ export default function HomeScreen() {
             <View style={styles.smallHead}>
               <AppText style={styles.smallTitle}>This week</AppText>
               <AppText type="label" numberOfLines={1}>
-                {average === null ? 'Nothing logged yet' : `Avg ${average} items a day`}
+                {average === null ? 'Nothing logged yet' : `Avg ${average} ${average === 1 ? 'item' : 'items'} a day`}
               </AppText>
             </View>
             <View

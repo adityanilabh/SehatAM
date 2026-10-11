@@ -7,7 +7,9 @@ import {
   ActionRow,
   NumberSetting,
   SettingsGroup,
+  SettingRow,
   StepperSetting,
+  SwitchSetting,
 } from '@/components/setting-rows';
 import { Colors, Fonts, Radius, Shadows, Spacing } from '@/constants/theme';
 import { deleteAllData, exportData, importData, parseBackup } from '@/db/backup';
@@ -16,7 +18,9 @@ import { updateSettings, type Settings } from '@/db/settings';
 import { isValidWeight } from '@/db/weight';
 import { pickBackupFile, saveBackupFile } from '@/lib/backup-file';
 import { friendlyTime, logDateFor } from '@/lib/day';
+import { shiftClockTime } from '@/lib/reminders';
 import { parseKg } from '@/lib/weight-stats';
+import { ensureReminderPermission, remindersSupported } from '@/notifications/reminders';
 
 /** The latest hour the day can be set to start: 11 am. */
 const LATEST_DAY_START = 11;
@@ -41,6 +45,21 @@ export default function SettingsScreen() {
   const save = async (changes: Partial<Settings>) => {
     await updateSettings(db, changes);
     invalidate();
+  };
+
+  // Switching a reminder on needs the phone's permission to show notifications.
+  const setReminder = async (
+    key: 'foodReminderEnabled' | 'weightReminderEnabled',
+    enabled: boolean
+  ) => {
+    if (enabled && !(await ensureReminderPermission())) {
+      notify(
+        'Notifications are off',
+        "Allow notifications for this app in your phone's settings, then switch the reminder on again."
+      );
+      return;
+    }
+    await save({ [key]: enabled });
   };
 
   const exportBackup = async () => {
@@ -133,6 +152,61 @@ export default function SettingsScreen() {
         />
       </SettingsGroup>
 
+      <SettingsGroup title="Reminders">
+        {remindersSupported ? (
+          <>
+            <SwitchSetting
+              label="Remind me to log food"
+              value={settings.foodReminderEnabled}
+              onChange={(enabled) => setReminder('foodReminderEnabled', enabled)}
+              last={!settings.foodReminderEnabled}
+            />
+            {settings.foodReminderEnabled ? (
+              <StepperSetting
+                label="Food reminder time"
+                text={friendlyTime(settings.foodReminderTime)}
+                decreaseLabel="Food reminder earlier"
+                increaseLabel="Food reminder later"
+                onDecrease={() =>
+                  save({ foodReminderTime: shiftClockTime(settings.foodReminderTime, -30) })
+                }
+                onIncrease={() =>
+                  save({ foodReminderTime: shiftClockTime(settings.foodReminderTime, 30) })
+                }
+              />
+            ) : null}
+            <View style={styles.reminderGap} />
+            <SwitchSetting
+              label="Remind me to log weight"
+              value={settings.weightReminderEnabled}
+              onChange={(enabled) => setReminder('weightReminderEnabled', enabled)}
+              last={!settings.weightReminderEnabled}
+            />
+            {settings.weightReminderEnabled ? (
+              <StepperSetting
+                label="Weight reminder time"
+                text={friendlyTime(settings.weightReminderTime)}
+                decreaseLabel="Weight reminder earlier"
+                increaseLabel="Weight reminder later"
+                onDecrease={() =>
+                  save({ weightReminderTime: shiftClockTime(settings.weightReminderTime, -30) })
+                }
+                onIncrease={() =>
+                  save({ weightReminderTime: shiftClockTime(settings.weightReminderTime, 30) })
+                }
+                last
+              />
+            ) : null}
+          </>
+        ) : (
+          <SettingRow
+            label="Available in the Android app"
+            hint="A browser cannot show reminders once its tab is closed"
+            last
+          />
+        )}
+      </SettingsGroup>
+
       <SettingsGroup title="Data">
         <ActionRow
           label="Export my data"
@@ -157,6 +231,10 @@ const styles = StyleSheet.create({
     padding: Spacing.four,
     gap: Spacing.one,
     boxShadow: Shadows.accent,
+  },
+  reminderGap: {
+    height: 1,
+    backgroundColor: Colors.line,
   },
   noticeTitle: {
     fontFamily: Fonts.bold,

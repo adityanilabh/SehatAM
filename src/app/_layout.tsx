@@ -11,6 +11,7 @@ import { useEffect } from 'react';
 import AppTabs from '@/components/app-tabs';
 import { Colors } from '@/constants/theme';
 import { DbProvider } from '@/db/provider';
+import { ReminderSync } from '@/notifications/reminder-sync';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -41,6 +42,7 @@ export default function RootLayout() {
     <ThemeProvider value={theme}>
       <StatusBar style="dark" />
       <DbProvider>
+        <ReminderSync />
         <AppTabs />
       </DbProvider>
     </ThemeProvider>

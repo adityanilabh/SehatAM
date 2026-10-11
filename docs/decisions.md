@@ -56,3 +56,20 @@ Decisions from the phase 1 spikes (step 2), with what was tested. Add new decisi
 Until the first build is run, `eas.json` is untested.
 
 **Package name (chosen 2026-10-12):** `com.adityanilabh.SehatAM`, set in `app.json`. It becomes permanent once the app is published on the Play Store.
+
+## 4. Choices made while building steps 3 to 8
+
+- **Day boundary.** An entry's day is decided once, when it is made, from the phone's local time and the day-start hour (default 4 am, changeable in Settings). It is stored as a plain date, so a later time-zone change never moves entries. Changing the day-start hour affects new entries only.
+- **One weight per day.** Logging a weight for a day that already has one replaces it.
+- **Items added to today are stamped with the current time**; items added to a past day get no time. Either can be changed in the edit sheet.
+- **Time is typed, not picked.** The time field accepts 8:30, 0830 or 8 instead of using a native time picker, which keeps one implementation across Android and web.
+- **Sheets are in-screen modals**, not routes. The tab bar only shows registered tabs, and a modal avoids restructuring the routes.
+- **Screens refresh through one revision counter.** Any write calls , and every query re-runs. Simple, and fast enough at this data size.
+- **No date library.** The few date functions needed are in  with tests, so  was not added.
+- **Backups merge on import.** Rows are matched by id and the most recently edited copy wins, so importing twice or importing an old file loses nothing.
+- **Export uses the share sheet on Android** and a download in the browser.
+- **Reminders are local notifications**, scheduled by the phone with fixed ids so re-scheduling replaces them. They are not offered in the browser.
+- **The history limit is one constant**,  in .
+- **Calories are not shown anywhere yet.** The column and the calorie target are stored, ready for phase 2.
+
+**Checked in a desktop browser only:** every screen was driven in headless Chrome (add, edit, delete, change day, log weight, export, delete all, import, restart). **Not checked on a phone:** keyboard behaviour around the add box and sheets, the Android share sheet and file picker, and whether reminders fire.

@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Switch, TextInput, View } from 'react-native';
 
 import { AppText } from './app-text';
 import { Card } from './card';
@@ -143,6 +143,29 @@ export function StepperSetting({
           onPress={onIncrease}
         />
       </View>
+    </SettingRow>
+  );
+}
+
+type SwitchSettingProps = {
+  label: string;
+  hint?: string;
+  value: boolean;
+  onChange: (value: boolean) => void;
+  last?: boolean;
+};
+
+/** An on/off setting. */
+export function SwitchSetting({ label, hint, value, onChange, last }: SwitchSettingProps) {
+  return (
+    <SettingRow label={label} hint={hint} last={last}>
+      <Switch
+        aria-label={label}
+        value={value}
+        onValueChange={onChange}
+        trackColor={{ false: Colors.border, true: Colors.accent }}
+        thumbColor={Colors.card}
+      />
     </SettingRow>
   );
 }
