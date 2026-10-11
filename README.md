@@ -79,4 +79,4 @@ Install new packages with `npx expo install <package>` so the versions match the
 
 ## Status
 
-Steps 1 to 8 of 9 are built: the food log, weight tracking with a graph, the Home screen with streaks, settings with export and import, and daily reminders. All of it has been checked in a desktop browser; the Android side still needs checking on a phone, reminders in particular. Step 9 (polish and release preparation) is next. Technical decisions are in .
+Steps 1 to 8 of 9 are built: the food log, weight tracking with a graph, the Home screen with streaks, settings with export and import, and daily reminders. All of it has been checked in a desktop browser; the Android side still needs checking on a phone, reminders in particular. Step 9 (polish and release preparation) is next. Technical decisions are in `docs/decisions.md`.
