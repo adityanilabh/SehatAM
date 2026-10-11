@@ -7,6 +7,12 @@ import { type ReminderSettings } from '@/lib/reminders';
 
 export const remindersSupported = false;
 
+/** Shown in Settings when reminders cannot be offered. */
+export const remindersUnavailable = {
+  label: 'Available in the Android app',
+  hint: 'A browser cannot show reminders once its tab is closed',
+};
+
 export async function ensureReminderPermission(): Promise<boolean> {
   return false;
 }

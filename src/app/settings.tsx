@@ -20,7 +20,11 @@ import { pickBackupFile, saveBackupFile } from '@/lib/backup-file';
 import { friendlyTime, logDateFor } from '@/lib/day';
 import { shiftClockTime } from '@/lib/reminders';
 import { parseKg } from '@/lib/weight-stats';
-import { ensureReminderPermission, remindersSupported } from '@/notifications/reminders';
+import {
+  ensureReminderPermission,
+  remindersSupported,
+  remindersUnavailable,
+} from '@/notifications/reminders';
 
 /** The latest hour the day can be set to start: 11 am. */
 const LATEST_DAY_START = 11;
@@ -200,8 +204,8 @@ export default function SettingsScreen() {
           </>
         ) : (
           <SettingRow
-            label="Available in the Android app"
-            hint="A browser cannot show reminders once its tab is closed"
+            label={remindersUnavailable.label}
+            hint={remindersUnavailable.hint}
             last
           />
         )}
