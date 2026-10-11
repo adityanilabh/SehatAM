@@ -71,8 +71,10 @@ Install new packages with `npx expo install <package>` so the versions match the
 - `src/app/` — one file per screen (Expo Router); `_layout.tsx` loads fonts and the tab bar.
 - `src/components/` — shared pieces: screen wrapper, card, button, text, tab bar.
 - `src/constants/theme.ts` — colours, fonts, spacing and radii from the mockups.
+- `src/db/` — database code; `migrate.ts` runs schema upgrades.
 - `src/lib/` — plain logic with unit tests.
+- `docs/decisions.md` — technical decisions and what was tested.
 
 ## Status
 
-Step 1 of 9 (setup) is done: the app opens with four empty tabs (Home, Food, Weight, Settings) in the mockup styling. No features are built yet.
+Steps 1 and 2 of 9 are done: the app opens with four empty tabs (Home, Food, Weight, Settings) in the mockup styling, and the storage, database upgrade and signing decisions are recorded in `docs/decisions.md`. No features are built yet.

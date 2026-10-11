@@ -1,0 +1,57 @@
+# Technical decisions
+
+Decisions from the phase 1 spikes (step 2), with what was tested. Add new decisions at the bottom.
+
+## 1. Storage on the web: use expo-sqlite everywhere
+
+**Decision:** one storage implementation, `expo-sqlite`, on Android and on the web. No separate IndexedDB version. Use only the async API (`openDatabaseAsync`, `runAsync`, `getFirstAsync`, `getAllAsync`, `execAsync`, `withTransactionAsync`).
+
+**Why:** it works in the browser today, so a second implementation would be extra code to keep in step for no gain.
+
+**Tested on 2026-10-12** (Expo SDK 57, expo-sqlite 57.0.4, headless Chrome on Windows, static web export):
+
+- A page opened the database, ran two migrations, inserted a row and counted rows.
+- Across three separate browser launches the count went 1, 2, 3, so data persists after the browser closes.
+- It worked with and without the `Cross-Origin-Embedder-Policy` / `Cross-Origin-Opener-Policy` headers. The headers are only needed for the sync API, which we do not use, so the web host needs no special configuration.
+
+**Limits found:**
+
+- **One tab at a time.** A second tab on the same site fails to open the database (`NoModificationAllowedError` from `createSyncAccessHandle`). The app must catch this and show "already open in another tab".
+- **Expo labels web support alpha.** All database access goes through our own functions (`addFood`, `getDay`, ...), never `expo-sqlite` directly from a screen, so the web side can be replaced if it proves unreliable.
+- **Not supported on web:** `withExclusiveTransactionAsync`. Use `withTransactionAsync`.
+- **Metro needs `wasm` in `assetExts`** (see `metro.config.js`).
+
+**Not tested:** Safari, Firefox, and a real Android device. Android uses the native SQLite build, which is the stable path; it gets its first real test when the food log lands (step 4).
+
+## 2. Database upgrades: numbered migrations with `PRAGMA user_version`
+
+**Decision:** the schema version is SQLite's `user_version`. Upgrades are an ordered list of migrations, each moving the database up one version. The runner is `src/db/migrate.ts`.
+
+**Rules:**
+
+- Each migration and its version bump run in one transaction, so a failure leaves the database untouched.
+- A shipped migration is never edited or removed; changes go in a new one.
+- A table is never dropped or rewritten in the migration that replaces it. Copy the data first and remove the old table in a later release.
+- A database newer than the app (version higher than the app knows) is refused, not downgraded.
+
+**Tested** by unit tests against real SQLite (`src/db/__tests__/migrate.test.ts`, using Node's built-in `node:sqlite`): fresh install, upgrade that keeps existing rows, no-op when current, rollback on failure, refusal of a newer database, and upgrade of a database file left on disk by an earlier release.
+
+## 3. Android signing key: EAS-managed upload key plus Play App Signing
+
+**Decision:**
+
+- EAS Build generates and stores the Android keystore. It is not kept in the repo (`*.jks` is ignored).
+- Download a backup of the keystore with `eas credentials` right after the first build and keep it somewhere safe outside the repo.
+- When the app is created in Play Console, enrol in Play App Signing. Google then holds the real app signing key and the EAS keystore is only the upload key, which Google can reset if it is ever lost.
+- Builds for testers use the `preview` profile (an installable APK); the store build uses `production` (an app bundle). Both are in `eas.json`.
+
+**Why:** losing the only signing key means the installed app can never be updated. With Play App Signing the key that can be lost is replaceable.
+
+**Not yet done (needs the account owner):**
+
+1. Choose the Android package name, for example `com.<yourname>.<appname>`. It is permanent once the app is on the Play Store.
+2. Create or log in to an Expo account: `npx eas-cli@latest login`.
+3. Run the first build: `npx eas-cli@latest build --profile preview --platform android`. This creates the keystore and confirms `eas.json` works.
+4. Back up the keystore with `npx eas-cli@latest credentials`.
+
+Until step 3 is run, `eas.json` is untested.
