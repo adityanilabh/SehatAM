@@ -9,7 +9,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Platform, StyleSheet, View } from 'react-native';
 
 import { DATABASE_NAME, prepareDb, type AppDb, type SqlParams } from './database';
 import { DEFAULT_SETTINGS, getSettings, type Settings } from './settings';
@@ -31,6 +31,47 @@ const DbContext = createContext<DbContextValue | null>(null);
 // One connection for the whole app. On the web a second open would fail, and
 // development mode mounts components twice.
 let opening: Promise<AppDb> | null = null;
+
+const isLockedByAnotherPage = (error: unknown) => {
+  const text = String(error);
+  return text.includes('NoModificationAllowedError') || text.includes('Access Handle');
+};
+
+const RETRY_KEY = 'sehatam-open-retries';
+const MAX_RELOADS = 3;
+
+/**
+ * In a browser the page being left (on a reload, or when the address changes in the
+ * same tab) can still hold the database for a moment after the new page starts,
+ * which looks the same as a second tab having it open. Retrying in place does not
+ * work, because the failed attempt leaves the SQLite worker unusable, so the page
+ * reloads itself a few times before giving up. Returns true if a reload is coming.
+ */
+function reloadIfBrieflyLocked(error: unknown): boolean {
+  if (Platform.OS !== 'web' || !isLockedByAnotherPage(error)) return false;
+  try {
+    const reloads = Number(window.sessionStorage.getItem(RETRY_KEY) ?? '0');
+    if (reloads >= MAX_RELOADS) {
+      window.sessionStorage.removeItem(RETRY_KEY);
+      return false;
+    }
+    window.sessionStorage.setItem(RETRY_KEY, String(reloads + 1));
+    setTimeout(() => window.location.reload(), 500);
+    return true;
+  } catch {
+    // Session storage can be unavailable (private windows); show the message instead.
+    return false;
+  }
+}
+
+function clearReloadCount() {
+  if (Platform.OS !== 'web') return;
+  try {
+    window.sessionStorage.removeItem(RETRY_KEY);
+  } catch {
+    // Nothing to clear.
+  }
+}
 
 function openAppDb(): Promise<AppDb> {
   opening ??= (async () => {
@@ -62,11 +103,10 @@ function openAppDb(): Promise<AppDb> {
 }
 
 function describeOpenError(error: unknown): string {
-  const text = String(error);
-  if (text.includes('NoModificationAllowedError') || text.includes('Access Handle')) {
+  if (isLockedByAnotherPage(error)) {
     return 'SehatAM is already open in another tab. Close the other tab, then reload this one.';
   }
-  return `Your data could not be opened. Close the app and open it again.\n\n${text}`;
+  return `Your data could not be opened. Close the app and open it again.\n\n${String(error)}`;
 }
 
 export function DbProvider({ children }: { children: ReactNode }) {
@@ -78,8 +118,14 @@ export function DbProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let live = true;
     openAppDb().then(
-      (opened) => live && setDb(opened),
-      (reason) => live && setError(describeOpenError(reason))
+      (opened) => {
+        clearReloadCount();
+        if (live) setDb(opened);
+      },
+      (reason) => {
+        if (reloadIfBrieflyLocked(reason)) return;
+        if (live) setError(describeOpenError(reason));
+      }
     );
     return () => {
       live = false;

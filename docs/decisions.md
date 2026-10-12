@@ -83,4 +83,15 @@ Until the first build is run, `eas.json` is untested.
 - **Number settings have a Save button.** It appears once the value is changed, and "Saved" shows afterwards. Leaving the field still saves.
 - **Transactions wait their turn.** The database adapter queues transactions, because two writes started close together failed with "cannot start a transaction within a transaction".
 
+## 6. Step 9 refinements so far (2026-10-12)
+
+- **Web reload.** Reloading, or changing the address in the same tab, could show "already open in another tab": the page being left still held the database for a moment. Retrying in place fails, because the failed attempt leaves the SQLite worker unusable ("Invalid VFS state"), so the page reloads itself up to three times before showing the message. A real second tab still gets the message.
+- **Web first paint.** The web version no longer waits for the font before drawing, and the page background is painted by the HTML shell (`src/app/+html.tsx`). The page title is set with the router's `Head`.
+- **Unused packages removed:** `@expo/ui`, `expo-device`, `expo-glass-effect`, `expo-image`, `expo-symbols`, `expo-web-browser`. `react-native-gesture-handler`, `react-native-reanimated` and `react-native-worklets` are kept, as the router lists them as optional peers.
+- **`npm audit` warnings** (62 on 2026-10-12) all trace to five packages used by build and test tooling (`braces`, `node-forge`, `sprintf-js`, `uuid`, `decode-uri-component`), pulled in by Expo's command-line tools and Jest. None is part of the app that ships. The suggested `npm audit fix --force` would downgrade Expo, so nothing was changed.
+- **Icon and splash are a draft:** a white bowl with a rising line on the accent blue. Regenerate from the SVG if the design changes.
+- **Privacy policy** is `public/privacy.html`, served with the web version at `/privacy.html`. Its contact line is still a placeholder.
+- **Deferred with the web deployment:** the install manifest and offline support (service worker).
+- **Waiting on accounts:** crash reporting (Sentry) and over-the-air updates (Expo login).
+
 **Checked in a desktop browser only:** every screen was driven in headless Chrome (add, edit, delete, change day, log weight, export, delete all, import, restart). **Not checked on a phone:** keyboard behaviour around the add box and sheets, the Android share sheet and file picker, and whether reminders fire.

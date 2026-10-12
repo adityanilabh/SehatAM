@@ -4,9 +4,11 @@ import { DMSans_600SemiBold } from '@expo-google-fonts/dm-sans/600SemiBold';
 import { DMSans_700Bold } from '@expo-google-fonts/dm-sans/700Bold';
 import { useFonts } from '@expo-google-fonts/dm-sans/useFonts';
 import { DefaultTheme, ThemeProvider } from 'expo-router';
+import Head from 'expo-router/head';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
+import { Platform } from 'react-native';
 
 import AppTabs from '@/components/app-tabs';
 import { Colors } from '@/constants/theme';
@@ -28,7 +30,9 @@ export default function RootLayout() {
     DMSans_700Bold,
   });
   // A font failure should not block the app; it falls back to the system font.
-  const ready = fontsLoaded || fontError !== null;
+  // The web version never waits: it has no splash screen to hide behind, so it
+  // draws at once and the font swaps in when it arrives.
+  const ready = fontsLoaded || fontError !== null || Platform.OS === 'web';
 
   useEffect(() => {
     if (ready) {
@@ -40,6 +44,9 @@ export default function RootLayout() {
 
   return (
     <ThemeProvider value={theme}>
+      <Head>
+        <title>SehatAM</title>
+      </Head>
       <StatusBar style="dark" />
       <DbProvider>
         <ReminderSync />
