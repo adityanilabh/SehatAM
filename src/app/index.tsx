@@ -2,26 +2,26 @@ import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/app-text';
-import { Button } from '@/components/button';
 import { Card } from '@/components/card';
-import { ChevronRightIcon, PlusIcon } from '@/components/icons';
+import { ChevronRightIcon } from '@/components/icons';
 import { Screen } from '@/components/screen';
 import { Colors, Fonts, Radius, Shadows, Spacing } from '@/constants/theme';
 import { getFoodCountsByDay, getFoodForDay, getLoggedDates } from '@/db/food';
 import { useDb, useDbQuery } from '@/db/provider';
-import { getRecentWeights } from '@/db/weight';
+import { getFirstWeight, getRecentWeights } from '@/db/weight';
 import { useToday } from '@/hooks/use-today';
 import { barHeights, spreadBarHeights } from '@/lib/chart';
 import { addDays, dateRange, longDate, shortDate, weekdayInitial } from '@/lib/day';
 import { greetingFor } from '@/lib/greeting';
 import { currentStreak } from '@/lib/streak';
+import { summariseWeights } from '@/lib/weight-stats';
 import { formatWeight } from '@/lib/weight-unit';
 
 const WEEK_BAR_HEIGHT = 44;
 
 export default function HomeScreen() {
   const router = useRouter();
-  const unit = useDb().settings.weightUnit;
+  const { weightUnit: unit, targetWeightKg } = useDb().settings;
   const today = useToday();
   const weekStart = addDays(today, -6);
 
@@ -31,6 +31,7 @@ export default function HomeScreen() {
     loggedDates: await getLoggedDates(db, today),
     // Newest first.
     weights: await getRecentWeights(db, today, 7),
+    firstWeight: await getFirstWeight(db),
   }));
 
   const todayItems = data?.todayItems ?? [];
@@ -53,6 +54,18 @@ export default function HomeScreen() {
       ? latestWeight!.weightKg - weekWeights[0].weightKg
       : null;
   const weekChangeText = weekChange === null ? '0.0' : formatWeight(Math.abs(weekChange), unit);
+  const target = summariseWeights(latestWeight ? [latestWeight] : [], data?.firstWeight ?? null, targetWeightKg);
+  // With a target set, the card says how far there is to go; otherwise the week's change.
+  const weightNote =
+    target.toGo !== null
+      ? target.reached
+        ? 'Target reached'
+        : `${formatWeight(target.toGo, unit)} ${unit} to target`
+      : weekChange !== null && weekChangeText !== '0.0'
+        ? `${weekChange < 0 ? 'Down' : 'Up'} ${weekChangeText} ${unit} this week`
+        : latestWeight
+          ? `Last logged ${shortDate(latestWeight.logDate)}`
+          : 'Nothing logged yet';
   const weightHeights = spreadBarHeights(
     weights.map((entry) => entry.weightKg),
     40,
@@ -66,7 +79,7 @@ export default function HomeScreen() {
     <Screen
       title={greetingFor(new Date().getHours())}
       eyebrow={longDate(today)}
-      footer={<Button label="Add food" icon={PlusIcon} onPress={() => router.navigate('/food')} />}>
+>
       <Pressable
         role="link"
         aria-label={`${todayItems.length} items logged today. Open food log`}
@@ -99,11 +112,7 @@ export default function HomeScreen() {
             <View style={styles.smallHead}>
               <AppText style={styles.smallTitle}>Weight</AppText>
               <AppText type="label" numberOfLines={1}>
-                {weekChange !== null && weekChangeText !== '0.0'
-                  ? `${weekChange < 0 ? 'Down' : 'Up'} ${weekChangeText} ${unit} this week`
-                  : latestWeight
-                    ? `Last logged ${shortDate(latestWeight.logDate)}`
-                    : 'Nothing logged yet'}
+                {weightNote}
               </AppText>
             </View>
             <View style={styles.weightFoot}>

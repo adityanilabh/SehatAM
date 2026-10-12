@@ -1,6 +1,8 @@
-import { StyleSheet, View } from 'react-native';
+import { useState } from 'react';
+import { Keyboard, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/app-text';
+import { Button } from '@/components/button';
 import { confirm, notify } from '@/components/confirm';
 import { Screen } from '@/components/screen';
 import { Segmented } from '@/components/segmented';
@@ -123,6 +125,49 @@ export default function SettingsScreen() {
 
   const { dayStartHour, weightUnit } = settings;
 
+  // The two goals are typed, then saved together with the Save goals button.
+  // A draft is null until its field is edited, so the stored value shows.
+  const storedCalories = settings.calorieTarget === null ? '' : String(settings.calorieTarget);
+  const storedTarget =
+    settings.targetWeightKg === null
+      ? ''
+      : String(Number(formatWeight(settings.targetWeightKg, weightUnit)));
+  const [calorieDraft, setCalorieDraft] = useState<string | null>(null);
+  const [targetDraft, setTargetDraft] = useState<string | null>(null);
+  const [goalErrors, setGoalErrors] = useState<{ calories?: string; target?: string }>({});
+  const [goalsSaved, setGoalsSaved] = useState(false);
+
+  const calorieText = calorieDraft ?? storedCalories;
+  const targetText = targetDraft ?? storedTarget;
+  const caloriesChanged = calorieText.trim() !== storedCalories;
+  const targetChanged = targetText.trim() !== storedTarget;
+  const goalsUnsaved = caloriesChanged || targetChanged;
+
+  const saveGoals = async () => {
+    Keyboard.dismiss();
+    const calorieTarget = parseCalories(calorieText);
+    const targetWeightKg = parseTargetWeight(targetText, weightUnit);
+    const errors = {
+      calories:
+        caloriesChanged && calorieTarget === undefined
+          ? 'Enter a whole number from 500 to 10000'
+          : undefined,
+      target:
+        targetChanged && targetWeightKg === undefined ? 'Enter a weight, such as 70' : undefined,
+    };
+    setGoalErrors(errors);
+    if (errors.calories || errors.target) return;
+
+    // Only what was edited is written, so an untouched weight is not re-rounded.
+    await save({
+      ...(caloriesChanged ? { calorieTarget } : {}),
+      ...(targetChanged ? { targetWeightKg } : {}),
+    });
+    setCalorieDraft(null);
+    setTargetDraft(null);
+    setGoalsSaved(true);
+  };
+
   return (
     <Screen title="Settings">
       <View style={styles.notice}>
@@ -137,31 +182,53 @@ export default function SettingsScreen() {
           label="Daily calorie target"
           hint="Used once calorie estimates arrive"
           unit="kcal"
-          value={settings.calorieTarget}
+          text={calorieText}
+          onChangeText={(text) => {
+            setCalorieDraft(text);
+            setGoalsSaved(false);
+          }}
           placeholder="None"
-          invalidHint="Enter a whole number from 500 to 10000"
-          parse={parseCalories}
-          onSave={(calorieTarget) => save({ calorieTarget })}
+          error={goalErrors.calories}
         />
         <NumberSetting
           label="Target weight"
           unit={weightUnit}
-          value={
-            settings.targetWeightKg === null
-              ? null
-              : Number(formatWeight(settings.targetWeightKg, weightUnit))
-          }
+          text={targetText}
+          onChangeText={(text) => {
+            setTargetDraft(text);
+            setGoalsSaved(false);
+          }}
           placeholder="None"
-          invalidHint="Enter a weight, such as 70"
-          parse={(text) => parseTargetWeight(text, weightUnit)}
-          onSave={(targetWeightKg) => save({ targetWeightKg })}
+          error={goalErrors.target}
+          last
         />
+        <View style={styles.saveGoals}>
+          <Button label="Save goals" tone="accent" onPress={saveGoals} />
+          <AppText
+            type="caption"
+            color={goalsSaved ? 'accent' : undefined}
+            style={styles.saveStatus}
+            aria-live="polite">
+            {goalsSaved
+              ? 'Saved. Your target shows on the Home and Weight screens.'
+              : goalsUnsaved
+                ? 'You have unsaved changes.'
+                : 'Change a goal, then press Save goals.'}
+          </AppText>
+        </View>
+      </SettingsGroup>
+
+      <SettingsGroup title="Preferences">
         <SettingRow label="Weight unit">
           <Segmented
             label="Weight unit"
             options={WEIGHT_UNITS}
             value={weightUnit}
-            onChange={(next) => save({ weightUnit: next })}
+            onChange={(next) => {
+              // A half-typed target is in the old unit, so it is dropped.
+              setTargetDraft(null);
+              save({ weightUnit: next });
+            }}
           />
         </SettingRow>
         <StepperSetting
@@ -263,6 +330,13 @@ const styles = StyleSheet.create({
   reminderGap: {
     height: 1,
     backgroundColor: Colors.line,
+  },
+  saveGoals: {
+    paddingBottom: Spacing.three,
+    gap: Spacing.two,
+  },
+  saveStatus: {
+    textAlign: 'center',
   },
   noticeTitle: {
     fontFamily: Fonts.bold,
