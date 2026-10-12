@@ -428,7 +428,11 @@ export function memoryFor(text: string, kcal: number): MemoryEntry[] {
     // came with a unit the app cannot convert.
     const [segment] = segments;
     const servings =
-      parts.length === 1 ? parts[0].servings : segment.hasUnit ? null : segment.amount;
+      parts.length === 1 && parts[0].kcal !== null
+        ? parts[0].servings
+        : segment.hasUnit
+          ? null
+          : segment.amount;
     if (servings !== null && servings > 0) {
       entries.push({
         key: segment.words.join(' '),

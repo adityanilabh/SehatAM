@@ -9,6 +9,7 @@ Phase 1 is the app working fully on the device, with no AI, no login and no back
 ### Features
 
 - **Food log:** add an item in one line, with optional time and quantity; edit and delete.
+- **Calories:** filled in automatically from a built-in list of common Indian foods, editable by hand, with an option to ask an AI app for foods the list does not know. The app remembers figures you give it.
 - **Meals:** file each item under breakfast, lunch, evening snack or dinner; the day's list is grouped by meal.
 - **Days:** step between days, jump to any past day from a calendar, and pull down to return to today. Each item is assigned to a day, so late-night eating can count for the previous day.
 - **Weight:** log weight in kilograms or pounds when you like, with a graph (7 days and 25 days) that redraws from the entries, plus start, target and to-go figures.
@@ -25,7 +26,7 @@ Phase 1 is the app working fully on the device, with no AI, no login and no back
 
 ### Not in phase 1
 
-- Calorie estimates from AI (phase 2).
+- Calorie estimates by AI inside the app (premium, needs the backend).
 - Photos, meal plans and grocery links.
 - Sign in, cloud storage and sync.
 - Walking counter.

@@ -95,3 +95,18 @@ Until the first build is run, `eas.json` is untested.
 - **Waiting on accounts:** crash reporting (Sentry) and over-the-air updates (Expo login).
 
 **Checked in a desktop browser only:** every screen was driven in headless Chrome (add, edit, delete, change day, log weight, export, delete all, import, restart). **Not checked on a phone:** keyboard behaviour around the add box and sheets, the Android share sheet and file picker, and whether reminders fire.
+
+## 7. Calorie counting (2026-10-12)
+
+- **Built-in food list.** `src/lib/food-list.ts` holds about 240 common Indian foods with the calories in one usual serving. The figures are typical values written from general knowledge, not taken from a published table, and need reviewing before release.
+- **Reading what is typed.** `src/lib/calories.ts` reads text left to right as amounts and foods: "3 egg white and 1 egg whole" is 3 x 17 + 72 = 123 kcal. It understands numbers, fractions, "half", and units (katori, plate, glass, cup, tsp, tbsp, grams, ml). The longest matching name wins, so "egg white" is not read as "egg".
+- **No partial totals.** If any part of an item is not known, the item has no calorie figure at all, so a partial sum is never shown as the total.
+- **Several-word foods.** A known word next to unknown words ("paneer wrap") is treated as one unknown food, not as paneer plus something. Two known foods side by side ("dal rice") are added together.
+- **Memory.** A figure the user types, or pastes from an AI app, is stored in `food_memory`: once for the exact text, and once per single unit when the text is one food. Memory is consulted before the built-in list, so a user's correction to a listed food replaces the list's figure for them.
+- **AI hand-off, free.** For items without calories the app writes a numbered prompt, sends it through the share sheet to whichever AI app the user picks, and reads the pasted reply. The reply parser accepts "1 | 240", "1. 240 kcal", ranges and stray text. Nothing is sent by the app itself, so there is no API cost.
+- **Where a figure came from** is stored per item in `calorie_source`: `list`, `memory`, `ai` or `manual`.
+- **Suggestions** while typing come from foods logged before.
+- **Schema version 3** adds `calorie_source` and `food_memory`. **Backup format 3** carries both; older backups still import.
+- **Home** shows calories today against the daily target, with a progress ring when a target is set, and the week's bars are calories per day.
+- **Not built:** a food list for other countries, and in-app AI estimates for premium, which need the backend.
+- **Not checked on a phone:** the share sheet, pasting from the clipboard, and the keyboard around the suggestion and meal chips.

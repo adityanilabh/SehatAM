@@ -164,3 +164,45 @@ describe('asking an AI app', () => {
     expect(parseCalorieReply('Sorry, I cannot help with that.', 2)).toEqual([null, null]);
   });
 });
+
+describe('foods made of several words', () => {
+  it('treats a known word beside unknown words as one unknown food', () => {
+    const estimate = estimateCalories('paneer wrap');
+
+    expect(estimate.total).toBeNull();
+    expect(estimate.parts.map((part) => [part.label, part.kcal])).toEqual([['paneer wrap', null]]);
+  });
+
+  it('still adds up two known foods written side by side', () => {
+    expect(total('dal rice')).toBe(350);
+    expect(total('2 idli sambar')).toBe(90 + 130);
+  });
+
+  it('remembers a several-word food and uses it at other amounts', () => {
+    const memory = memoryFor('paneer wrap', 410);
+
+    expect(memory).toEqual([
+      { key: 'paneer wrap', kcal: 410, per: 'item' },
+      { key: 'paneer wrap', kcal: 410, per: 'unit' },
+    ]);
+    expect(total('2 paneer wrap', memory)).toBe(820);
+    expect(total('paneer wrap + chai', memory)).toBe(500);
+    // Plain paneer is still the listed food.
+    expect(total('100 g paneer', memory)).toBe(260);
+  });
+
+  it('keeps a merged food separate from its neighbours across a joiner', () => {
+    const estimate = estimateCalories('2 paneer wrap and 1 roti');
+
+    expect(estimate.parts.map((part) => [part.label, part.kcal])).toEqual([
+      ['2 paneer wrap', null],
+      ['1 roti', 80],
+    ]);
+  });
+
+  it('does not guess a per-unit figure when the amount has a unit it cannot convert', () => {
+    expect(memoryFor('1 plate paneer wrap', 600)).toEqual([
+      { key: '1 plate paneer wrap', kcal: 600, per: 'item' },
+    ]);
+  });
+});
