@@ -1,6 +1,6 @@
 import * as Clipboard from 'expo-clipboard';
 import { useState } from 'react';
-import { Share, StyleSheet, TextInput, View } from 'react-native';
+import { Pressable, Share, StyleSheet, TextInput, View } from 'react-native';
 
 import { AppText } from './app-text';
 import { Button } from './button';
@@ -12,6 +12,7 @@ import { type FoodEntry } from '@/db/food';
 import { setFoodCalories } from '@/db/food-totals';
 import { rememberCalories } from '@/db/memory';
 import { useDb } from '@/db/provider';
+import { AI_APPS, sendToAiApp, type AiApp } from '@/lib/ai-apps';
 import { buildCaloriePrompt, parseCalorieReply } from '@/lib/ai-handoff';
 import { formatNumber } from '@/lib/format';
 
@@ -22,8 +23,8 @@ export type AiSheetProps = {
 };
 
 /**
- * Gets calories from an AI app the user already has. The prompt is sent through
- * the phone's share sheet; the reply is pasted back and read here. What comes back
+ * Gets calories from an AI app the user already has. The question is sent to the app
+ * they pick; the reply is pasted back and read here. What comes back
  * is saved on the items and remembered for next time.
  */
 export function AiSheet({ items, onClose }: AiSheetProps) {
@@ -38,7 +39,18 @@ export function AiSheet({ items, onClose }: AiSheetProps) {
     notify('Prompt copied', 'Paste it into ChatGPT, Claude, Gemini or another AI app.');
   };
 
-  const openAiApp = async () => {
+  const openApp = async (app: AiApp) => {
+    // The question is also copied, in case the app opens without it filled in.
+    await Clipboard.setStringAsync(prompt);
+    if (await sendToAiApp(app, prompt)) return;
+    notify(
+      `${app.name} could not be opened`,
+      `It may not be installed on this phone. Pick another app, or use "Another app". The question has been copied, so you can also paste it yourself.`
+    );
+  };
+
+  // Any other app, through the phone's own share sheet.
+  const openShareSheet = async () => {
     try {
       await Share.share({ message: prompt });
     } catch {
@@ -69,14 +81,26 @@ export function AiSheet({ items, onClose }: AiSheetProps) {
   return (
     <Sheet visible title="Ask an AI app" onClose={onClose}>
       <View style={styles.step}>
-        <AppText style={styles.stepTitle}>1. Send the question</AppText>
+        <AppText style={styles.stepTitle}>1. Choose an AI app</AppText>
         <AppText type="caption">
-          This sends a ready-made question about {items.length === 1 ? 'this food' : 'these foods'}{' '}
-          to an AI app on your phone, such as ChatGPT, Claude or Gemini.
+          Your question about {items.length === 1 ? 'this food' : 'these foods'} is written for
+          you and sent to the app you pick.
         </AppText>
+        <View style={styles.apps}>
+          {AI_APPS.map((app) => (
+            <Pressable
+              key={app.name}
+              role="button"
+              aria-label={`Ask ${app.name}`}
+              onPress={() => openApp(app)}
+              style={({ pressed }) => [styles.app, pressed && styles.pressed]}>
+              <AppText style={styles.appName}>{app.name}</AppText>
+            </Pressable>
+          ))}
+        </View>
         <View style={styles.buttons}>
-          <Button label="Open an AI app" tone="accent" style={styles.grow} onPress={openAiApp} />
-          <Button label="Copy" tone="outline" onPress={copyPrompt} />
+          <Button label="Another app" tone="outline" style={styles.grow} onPress={openShareSheet} />
+          <Button label="Copy question" tone="outline" style={styles.grow} onPress={copyPrompt} />
         </View>
       </View>
 
@@ -132,6 +156,27 @@ const styles = StyleSheet.create({
   },
   stepTitle: {
     fontFamily: Fonts.bold,
+  },
+  apps: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  app: {
+    minHeight: 48,
+    paddingHorizontal: 18,
+    borderRadius: Radius.pill,
+    backgroundColor: Colors.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  appName: {
+    fontFamily: Fonts.bold,
+    fontSize: 14,
+    color: Colors.onAccent,
+  },
+  pressed: {
+    opacity: 0.7,
   },
   buttons: {
     flexDirection: 'row',
