@@ -12,8 +12,11 @@ import { isMeal } from '@/lib/meals';
  */
 
 export const BACKUP_APP = 'SehatAM';
-/** Version 2 added `meal` to food rows. Version 1 files are still accepted. */
-export const BACKUP_FORMAT_VERSION = 2;
+/**
+ * Version 2 added `meal` to food rows. Version 3 added `calorie_source` and the
+ * food memory. Older files are still accepted.
+ */
+export const BACKUP_FORMAT_VERSION = 3;
 
 type FoodBackupRow = {
   id: string;
@@ -24,7 +27,17 @@ type FoodBackupRow = {
   food_text: string;
   quantity: string | null;
   calories: number | null;
+  /** Absent before version 3. */
+  calorie_source?: string | null;
   created_at: string;
+  updated_at: string;
+};
+
+/** A calorie figure the app has learned; see `memory.ts`. */
+type MemoryBackupRow = {
+  key: string;
+  per: string;
+  kcal: number;
   updated_at: string;
 };
 
@@ -42,6 +55,7 @@ export type Backup = {
   exportedAt: string;
   food: FoodBackupRow[];
   weight: WeightBackupRow[];
+  memory: MemoryBackupRow[];
   settings: Settings;
 };
 
@@ -52,8 +66,13 @@ export type ImportResult = {
 
 export async function exportData(db: AppDb, now = new Date()): Promise<Backup> {
   const food = await db.getAllAsync<FoodBackupRow>(
-    `SELECT id, log_date, meal, eaten_at, food_text, quantity, calories, created_at, updated_at
+    `SELECT id, log_date, meal, eaten_at, food_text, quantity, calories, calorie_source,
+            created_at, updated_at
      FROM food_entry WHERE deleted_at IS NULL ORDER BY log_date, created_at`,
+    []
+  );
+  const memory = await db.getAllAsync<MemoryBackupRow>(
+    'SELECT key, per, kcal, updated_at FROM food_memory ORDER BY key, per',
     []
   );
   const weight = await db.getAllAsync<WeightBackupRow>(
@@ -68,6 +87,7 @@ export async function exportData(db: AppDb, now = new Date()): Promise<Backup> {
     exportedAt: now.toISOString(),
     food,
     weight,
+    memory,
     settings: await getSettings(db),
   };
 }
@@ -88,6 +108,18 @@ function isFoodRow(row: unknown): row is FoodBackupRow {
     isTextOrNull(row.quantity) &&
     (row.calories === null || typeof row.calories === 'number') &&
     isText(row.created_at) &&
+    isText(row.updated_at)
+  );
+}
+
+function isMemoryRow(row: unknown): row is MemoryBackupRow {
+  return (
+    isRecord(row) &&
+    isText(row.key) &&
+    (row.per === 'item' || row.per === 'unit') &&
+    typeof row.kcal === 'number' &&
+    Number.isFinite(row.kcal) &&
+    row.kcal >= 0 &&
     isText(row.updated_at)
   );
 }
@@ -131,6 +163,8 @@ export function parseBackup(text: string): Backup {
     exportedAt: typeof data.exportedAt === 'string' ? data.exportedAt : '',
     food: data.food,
     weight: data.weight,
+    // Losing a learned figure is harmless, so unreadable memory rows are skipped.
+    memory: Array.isArray(data.memory) ? data.memory.filter(isMemoryRow) : [],
     settings: normaliseSettings(isRecord(data.settings) ? data.settings : {}),
   };
 }
@@ -148,9 +182,9 @@ export async function importData(
     for (const row of backup.food) {
       await db.runAsync(
         `INSERT INTO food_entry
-           (id, log_date, meal, eaten_at, food_text, quantity, calories, created_at, updated_at,
-            deleted_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
+           (id, log_date, meal, eaten_at, food_text, quantity, calories, calorie_source,
+            created_at, updated_at, deleted_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
          ON CONFLICT (id) DO UPDATE SET
            log_date = excluded.log_date,
            meal = excluded.meal,
@@ -158,6 +192,7 @@ export async function importData(
            food_text = excluded.food_text,
            quantity = excluded.quantity,
            calories = excluded.calories,
+           calorie_source = excluded.calorie_source,
            updated_at = excluded.updated_at,
            deleted_at = NULL
          WHERE excluded.updated_at >= food_entry.updated_at`,
@@ -170,9 +205,21 @@ export async function importData(
           row.food_text,
           row.quantity,
           row.calories,
+          row.calories === null ? null : (row.calorie_source ?? 'manual'),
           row.created_at,
           row.updated_at,
         ]
+      );
+    }
+
+    for (const row of backup.memory) {
+      await db.runAsync(
+        `INSERT INTO food_memory (key, per, kcal, updated_at) VALUES (?, ?, ?, ?)
+         ON CONFLICT (key, per) DO UPDATE SET
+           kcal = excluded.kcal,
+           updated_at = excluded.updated_at
+         WHERE excluded.updated_at >= food_memory.updated_at`,
+        [row.key, row.per, row.kcal, row.updated_at]
       );
     }
 
@@ -214,6 +261,8 @@ export async function importData(
 /** Removes everything for good, including rows that were only marked deleted. */
 export async function deleteAllData(db: AppDb): Promise<void> {
   await db.withTransactionAsync(async () => {
-    await db.execAsync('DELETE FROM food_entry; DELETE FROM weight_entry; DELETE FROM setting;');
+    await db.execAsync(
+      'DELETE FROM food_entry; DELETE FROM weight_entry; DELETE FROM food_memory; DELETE FROM setting;'
+    );
   });
 }

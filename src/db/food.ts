@@ -13,11 +13,18 @@ export type FoodEntry = {
   eatenAt: string | null;
   foodText: string;
   quantity: string | null;
-  /** Filled in from phase 2 onward. */
+  /** Null until a figure is known. */
   calories: number | null;
+  /** Where the figure came from; null when there is none. */
+  calorieSource: CalorieSource | null;
   createdAt: string;
   updatedAt: string;
 };
+
+/** `list` and `memory` are worked out by the app; `ai` and `manual` come from the user. */
+export type CalorieSource = 'list' | 'memory' | 'ai' | 'manual';
+
+const CALORIE_SOURCES: CalorieSource[] = ['list', 'memory', 'ai', 'manual'];
 
 export type FoodInput = {
   logDate: LogDate;
@@ -25,6 +32,8 @@ export type FoodInput = {
   meal?: Meal | null;
   eatenAt?: string | null;
   quantity?: string | null;
+  calories?: number | null;
+  calorieSource?: CalorieSource | null;
 };
 
 type FoodRow = {
@@ -35,12 +44,13 @@ type FoodRow = {
   food_text: string;
   quantity: string | null;
   calories: number | null;
+  calorie_source: string | null;
   created_at: string;
   updated_at: string;
 };
 
 const COLUMNS =
-  'id, log_date, meal, eaten_at, food_text, quantity, calories, created_at, updated_at';
+  'id, log_date, meal, eaten_at, food_text, quantity, calories, calorie_source, created_at, updated_at';
 
 function toEntry(row: FoodRow): FoodEntry {
   return {
@@ -51,6 +61,10 @@ function toEntry(row: FoodRow): FoodEntry {
     foodText: row.food_text,
     quantity: row.quantity,
     calories: row.calories,
+    calorieSource:
+      row.calories !== null && CALORIE_SOURCES.includes(row.calorie_source as CalorieSource)
+        ? (row.calorie_source as CalorieSource)
+        : null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -61,25 +75,31 @@ function clean(input: FoodInput) {
   if (!foodText) {
     throw new Error('Food cannot be empty.');
   }
+  const typed = input.calories;
+  const calories =
+    typeof typed === 'number' && Number.isFinite(typed) && typed >= 0 ? Math.round(typed) : null;
   return {
     logDate: input.logDate,
     foodText,
     meal: input.meal ?? null,
     eatenAt: input.eatenAt?.trim() || null,
     quantity: input.quantity?.trim() || null,
+    calories,
+    calorieSource: calories === null ? null : (input.calorieSource ?? 'manual'),
   };
 }
 
 export async function addFood(db: AppDb, input: FoodInput, now = new Date()): Promise<FoodEntry> {
-  const { logDate, foodText, meal, eatenAt, quantity } = clean(input);
+  const { logDate, foodText, meal, eatenAt, quantity, calories, calorieSource } = clean(input);
   const id = newId();
   const stamp = now.toISOString();
 
   await db.runAsync(
     `INSERT INTO food_entry
-       (id, log_date, meal, eaten_at, food_text, quantity, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    [id, logDate, meal, eatenAt, foodText, quantity, stamp, stamp]
+       (id, log_date, meal, eaten_at, food_text, quantity, calories, calorie_source,
+        created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [id, logDate, meal, eatenAt, foodText, quantity, calories, calorieSource, stamp, stamp]
   );
 
   return {
@@ -89,7 +109,8 @@ export async function addFood(db: AppDb, input: FoodInput, now = new Date()): Pr
     eatenAt,
     foodText,
     quantity,
-    calories: null,
+    calories,
+    calorieSource,
     createdAt: stamp,
     updatedAt: stamp,
   };
@@ -101,13 +122,14 @@ export async function updateFood(
   input: FoodInput,
   now = new Date()
 ): Promise<void> {
-  const { logDate, foodText, meal, eatenAt, quantity } = clean(input);
+  const { logDate, foodText, meal, eatenAt, quantity, calories, calorieSource } = clean(input);
 
   await db.runAsync(
     `UPDATE food_entry
-     SET log_date = ?, meal = ?, eaten_at = ?, food_text = ?, quantity = ?, updated_at = ?
+     SET log_date = ?, meal = ?, eaten_at = ?, food_text = ?, quantity = ?, calories = ?,
+         calorie_source = ?, updated_at = ?
      WHERE id = ? AND deleted_at IS NULL`,
-    [logDate, meal, eatenAt, foodText, quantity, now.toISOString(), id]
+    [logDate, meal, eatenAt, foodText, quantity, calories, calorieSource, now.toISOString(), id]
   );
 }
 

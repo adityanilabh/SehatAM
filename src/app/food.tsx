@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 
+import { AiSheet } from '@/components/ai-sheet';
 import { AppText } from '@/components/app-text';
 import { CalendarSheet } from '@/components/calendar-sheet';
 import { Card } from '@/components/card';
@@ -17,9 +18,12 @@ import { MealChips } from '@/components/meal-chips';
 import { Screen } from '@/components/screen';
 import { Colors, Fonts, Radius, Shadows, Spacing } from '@/constants/theme';
 import { addFood, getFoodForDay, type FoodEntry } from '@/db/food';
+import { getFoodSuggestions } from '@/db/food-totals';
+import { estimateFor } from '@/db/memory';
 import { useDb, useDbQuery } from '@/db/provider';
 import { useToday } from '@/hooks/use-today';
 import { addDays, clockTime, dayTitle, shortDate, type LogDate } from '@/lib/day';
+import { formatNumber } from '@/lib/format';
 import { groupByMeal, mealForHour, type Meal } from '@/lib/meals';
 
 export default function FoodScreen() {
@@ -33,12 +37,18 @@ export default function FoodScreen() {
   const [chosenMeal, setChosenMeal] = useState<Meal | null | undefined>(undefined);
   const [editing, setEditing] = useState<FoodEntry | null>(null);
   const [calendarOpen, setCalendarOpen] = useState(false);
+  const [aiOpen, setAiOpen] = useState(false);
 
   const date = picked ?? today;
   const isToday = date === today;
   const meal =
     chosenMeal === undefined ? (isToday ? mealForHour(new Date().getHours()) : null) : chosenMeal;
   const entries = useDbQuery(`food:${date}`, (source) => getFoodForDay(source, date));
+  // While typing: earlier foods to pick from, and what the calories would come to.
+  const typing = useDbQuery(`typing:${draft}`, async (source) => ({
+    suggestions: await getFoodSuggestions(source, draft),
+    estimate: draft.trim() === '' ? null : await estimateFor(source, draft),
+  }));
 
   const goTo = (target: LogDate) => {
     setPicked(target >= today ? null : target);
@@ -49,17 +59,24 @@ export default function FoodScreen() {
     if (draft.trim() === '') return;
     // An item added to today is stamped with the current time; it can be cleared
     // or changed from the edit sheet. Items added to past days get no time.
+    // Calories come from what the user has taught the app, then the built-in list.
+    const estimate = await estimateFor(db, draft);
     await addFood(db, {
       logDate: date,
       foodText: draft,
       meal,
       eatenAt: isToday ? clockTime(new Date()) : null,
+      calories: estimate.total,
+      calorieSource: estimate.source,
     });
     setDraft('');
     invalidate();
   };
 
   const count = entries?.length ?? 0;
+  const missing = (entries ?? []).filter((entry) => entry.calories === null);
+  const totalKcal = (entries ?? []).reduce((sum, entry) => sum + (entry.calories ?? 0), 0);
+  const unknownParts = typing?.estimate?.parts.filter((part) => part.kcal === null) ?? [];
 
   return (
     <Screen
@@ -91,6 +108,33 @@ export default function FoodScreen() {
       }
       footer={
         <View style={styles.footer}>
+          {typing && typing.suggestions.length > 0 ? (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={styles.suggestions}>
+              {typing.suggestions.map((food) => (
+                <Pressable
+                  key={food}
+                  role="button"
+                  aria-label={`Use ${food}`}
+                  onPress={() => setDraft(food)}
+                  style={styles.suggestion}>
+                  <AppText style={styles.suggestionText} numberOfLines={1}>
+                    {food}
+                  </AppText>
+                </Pressable>
+              ))}
+            </ScrollView>
+          ) : null}
+          {typing?.estimate && typing.estimate.parts.length > 0 ? (
+            <AppText type="caption" style={styles.preview} aria-live="polite">
+              {typing.estimate.total !== null
+                ? `About ${formatNumber(typing.estimate.total)} kcal`
+                : `No calories yet for: ${unknownParts.map((part) => part.label).join(', ')}`}
+            </AppText>
+          ) : null}
           <MealChips value={meal} onChange={setChosenMeal} />
           <View style={styles.addBox}>
             <TextInput
@@ -134,11 +178,27 @@ export default function FoodScreen() {
       </View>
 
       <View style={styles.summary}>
-        <AppText style={styles.summaryCount}>{count}</AppText>
-        <AppText style={styles.summaryLabel}>
-          {count === 1 ? 'item logged' : 'items logged'}
-        </AppText>
+        <View style={styles.summaryLine}>
+          <AppText style={styles.summaryCount}>{formatNumber(totalKcal)}</AppText>
+          <AppText style={styles.summaryLabel}>
+            kcal from {count} {count === 1 ? 'item' : 'items'}
+          </AppText>
+        </View>
+        {missing.length > 0 ? (
+          <AppText style={styles.summaryLabel}>
+            {missing.length} {missing.length === 1 ? 'item has' : 'items have'} no calories yet
+          </AppText>
+        ) : null}
       </View>
+
+      {missing.length > 0 ? (
+        <Pressable
+          role="button"
+          onPress={() => setAiOpen(true)}
+          style={({ pressed }) => [styles.pill, styles.aiPill, pressed && styles.pressed]}>
+          <AppText style={styles.pillText}>Ask an AI app for the missing calories</AppText>
+        </Pressable>
+      ) : null}
 
       {entries && entries.length === 0 ? (
         <Card style={styles.empty}>
@@ -168,6 +228,8 @@ export default function FoodScreen() {
           onClose={() => setEditing(null)}
         />
       ) : null}
+
+      {aiOpen ? <AiSheet items={missing} onClose={() => setAiOpen(false)} /> : null}
 
       {calendarOpen ? (
         <CalendarSheet
@@ -228,10 +290,37 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.accent,
     paddingVertical: 18,
     paddingHorizontal: Spacing.four,
+    gap: Spacing.one,
+    boxShadow: Shadows.accent,
+  },
+  summaryLine: {
     flexDirection: 'row',
     alignItems: 'baseline',
     gap: Spacing.two,
-    boxShadow: Shadows.accent,
+  },
+  aiPill: {
+    alignSelf: 'center',
+    marginTop: -Spacing.two,
+  },
+  suggestions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  suggestion: {
+    minHeight: 44,
+    maxWidth: 240,
+    paddingHorizontal: 14,
+    borderRadius: Radius.pill,
+    backgroundColor: Colors.accentSoft,
+    justifyContent: 'center',
+  },
+  suggestionText: {
+    fontFamily: Fonts.semiBold,
+    fontSize: 13,
+    color: Colors.accent,
+  },
+  preview: {
+    marginLeft: Spacing.one,
   },
   summaryCount: {
     fontFamily: Fonts.bold,

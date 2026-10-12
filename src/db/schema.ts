@@ -45,4 +45,21 @@ export const migrations: Migration[] = [
     version: 2,
     up: (db) => db.execAsync('ALTER TABLE food_entry ADD COLUMN meal TEXT'),
   },
+  {
+    // Calories: where an item's figure came from, and what the app has learned
+    // from figures the user typed or pasted from an AI app.
+    version: 3,
+    up: (db) =>
+      db.execAsync(`
+        ALTER TABLE food_entry ADD COLUMN calorie_source TEXT;
+
+        CREATE TABLE food_memory (
+          key TEXT NOT NULL,
+          per TEXT NOT NULL,
+          kcal REAL NOT NULL,
+          updated_at TEXT NOT NULL,
+          PRIMARY KEY (key, per)
+        );
+      `),
+  },
 ];

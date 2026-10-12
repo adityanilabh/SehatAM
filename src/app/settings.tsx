@@ -180,7 +180,7 @@ export default function SettingsScreen() {
       <SettingsGroup title="Goals">
         <NumberSetting
           label="Daily calorie target"
-          hint="Used once calorie estimates arrive"
+          hint="Shown on the Home screen"
           unit="kcal"
           text={calorieText}
           onChangeText={(text) => {
@@ -210,7 +210,7 @@ export default function SettingsScreen() {
             style={styles.saveStatus}
             aria-live="polite">
             {goalsSaved
-              ? 'Saved. Your target shows on the Home and Weight screens.'
+              ? 'Saved. Your goals show on the Home and Weight screens.'
               : goalsUnsaved
                 ? 'You have unsaved changes.'
                 : 'Change a goal, then press Save goals.'}

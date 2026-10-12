@@ -1,33 +1,39 @@
 import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, View } from 'react-native';
+import Svg, { Circle } from 'react-native-svg';
 
 import { AppText } from '@/components/app-text';
 import { Card } from '@/components/card';
 import { ChevronRightIcon } from '@/components/icons';
 import { Screen } from '@/components/screen';
 import { Colors, Fonts, Radius, Shadows, Spacing } from '@/constants/theme';
-import { getFoodCountsByDay, getFoodForDay, getLoggedDates } from '@/db/food';
+import { getFoodForDay, getLoggedDates } from '@/db/food';
+import { getDayTotals } from '@/db/food-totals';
 import { useDb, useDbQuery } from '@/db/provider';
 import { getFirstWeight, getRecentWeights } from '@/db/weight';
 import { useToday } from '@/hooks/use-today';
 import { barHeights, spreadBarHeights } from '@/lib/chart';
 import { addDays, dateRange, longDate, shortDate, weekdayInitial } from '@/lib/day';
+import { formatNumber } from '@/lib/format';
 import { greetingFor } from '@/lib/greeting';
 import { currentStreak } from '@/lib/streak';
 import { summariseWeights } from '@/lib/weight-stats';
 import { formatWeight } from '@/lib/weight-unit';
 
 const WEEK_BAR_HEIGHT = 44;
+const RING_SIZE = 104;
+const RING_RADIUS = 44;
+const RING_LENGTH = 2 * Math.PI * RING_RADIUS;
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { weightUnit: unit, targetWeightKg } = useDb().settings;
+  const { weightUnit: unit, targetWeightKg, calorieTarget } = useDb().settings;
   const today = useToday();
   const weekStart = addDays(today, -6);
 
   const data = useDbQuery(`home:${today}`, async (db) => ({
     todayItems: await getFoodForDay(db, today),
-    weekCounts: await getFoodCountsByDay(db, weekStart, today),
+    weekTotals: await getDayTotals(db, weekStart, today),
     loggedDates: await getLoggedDates(db, today),
     // Newest first.
     weights: await getRecentWeights(db, today, 7),
@@ -38,13 +44,23 @@ export default function HomeScreen() {
   const streak = data ? currentStreak(data.loggedDates, today) : 0;
 
   const week = dateRange(weekStart, today);
-  const counts = week.map((date) => data?.weekCounts[date] ?? 0);
-  const weekHeights = barHeights(counts, WEEK_BAR_HEIGHT);
-  const activeDays = counts.filter((count) => count > 0);
+  const dailyKcal = week.map((date) => data?.weekTotals[date]?.kcal ?? 0);
+  const weekHeights = barHeights(dailyKcal, WEEK_BAR_HEIGHT);
+  // The average is over days that have calories, so unlogged days do not drag it down.
+  const activeDays = dailyKcal.filter((kcal) => kcal > 0);
   const average =
     activeDays.length > 0
-      ? Math.round(activeDays.reduce((sum, count) => sum + count, 0) / activeDays.length)
+      ? Math.round(activeDays.reduce((sum, kcal) => sum + kcal, 0) / activeDays.length)
       : null;
+
+  const todayTotal = data?.weekTotals[today] ?? { items: 0, kcal: 0, missing: 0 };
+  const progress = calorieTarget ? Math.min(1, todayTotal.kcal / calorieTarget) : null;
+  const heroNote =
+    calorieTarget === null
+      ? `${todayTotal.items} ${todayTotal.items === 1 ? 'item' : 'items'} logged`
+      : todayTotal.kcal <= calorieTarget
+        ? `${formatNumber(calorieTarget - todayTotal.kcal)} left of ${formatNumber(calorieTarget)}`
+        : `${formatNumber(todayTotal.kcal - calorieTarget)} over ${formatNumber(calorieTarget)}`;
 
   const weights = [...(data?.weights ?? [])].reverse();
   const latestWeight = weights[weights.length - 1] ?? null;
@@ -79,27 +95,66 @@ export default function HomeScreen() {
     <Screen
       title={greetingFor(new Date().getHours())}
       eyebrow={longDate(today)}
->
+      headerRight={
+        streak > 0 ? (
+          <View style={styles.streakChip}>
+            <AppText style={styles.streakChipText}>{streak}-day streak</AppText>
+          </View>
+        ) : null
+      }>
       <Pressable
         role="link"
-        aria-label={`${todayItems.length} items logged today. Open food log`}
+        aria-label={`${formatNumber(todayTotal.kcal)} calories today, ${heroNote}. Open food log`}
         onPress={() => router.navigate('/food')}
         style={({ pressed }) => [styles.hero, pressed && styles.pressed]}>
         <View style={styles.heroText}>
-          <AppText style={styles.heroLabel}>Logged today</AppText>
+          <AppText style={styles.heroLabel}>Calories today</AppText>
           <View style={styles.heroCountRow}>
-            <AppText style={styles.heroCount}>{todayItems.length}</AppText>
-            <AppText style={styles.heroUnit}>{todayItems.length === 1 ? 'item' : 'items'}</AppText>
+            <AppText style={styles.heroCount}>{formatNumber(todayTotal.kcal)}</AppText>
+            <AppText style={styles.heroUnit}>kcal</AppText>
           </View>
+          <AppText style={styles.heroNote}>
+            {heroNote}
+            {todayTotal.missing > 0
+              ? ` · ${todayTotal.missing} without calories`
+              : ''}
+          </AppText>
           <View style={styles.heroLink}>
             <AppText style={styles.heroLinkText}>Open food log</AppText>
             <ChevronRightIcon color={Colors.onAccent} size={16} />
           </View>
         </View>
-        <View style={styles.streak}>
-          <AppText style={styles.streakCount}>{streak}</AppText>
-          <AppText style={styles.streakLabel}>day streak</AppText>
-        </View>
+        {progress === null ? (
+          <View style={styles.streak}>
+            <AppText style={styles.streakCount}>{streak}</AppText>
+            <AppText style={styles.streakLabel}>day streak</AppText>
+          </View>
+        ) : (
+          <View style={styles.ring}>
+            <Svg width={RING_SIZE} height={RING_SIZE}>
+              <Circle
+                cx={RING_SIZE / 2}
+                cy={RING_SIZE / 2}
+                r={RING_RADIUS}
+                fill="none"
+                stroke="rgba(255, 255, 255, 0.28)"
+                strokeWidth={8}
+              />
+              <Circle
+                cx={RING_SIZE / 2}
+                cy={RING_SIZE / 2}
+                r={RING_RADIUS}
+                fill="none"
+                stroke={Colors.onAccent}
+                strokeWidth={8}
+                strokeLinecap="round"
+                strokeDasharray={[RING_LENGTH * progress, RING_LENGTH]}
+                transform={`rotate(-90 ${RING_SIZE / 2} ${RING_SIZE / 2})`}
+              />
+            </Svg>
+            <AppText style={styles.ringText}>{Math.round(progress * 100)}%</AppText>
+          </View>
+        )}
       </Pressable>
 
       <View style={styles.pair}>
@@ -147,13 +202,13 @@ export default function HomeScreen() {
             <View style={styles.smallHead}>
               <AppText style={styles.smallTitle}>This week</AppText>
               <AppText type="label" numberOfLines={1}>
-                {average === null ? 'Nothing logged yet' : `Avg ${average} ${average === 1 ? 'item' : 'items'} a day`}
+                {average === null ? 'No calories yet' : `Avg ${formatNumber(average)} kcal a day`}
               </AppText>
             </View>
             <View
               style={styles.weekBars}
               role="img"
-              aria-label={`Items logged on each of the last 7 days: ${counts.join(', ')}`}>
+              aria-label={`Calories on each of the last 7 days: ${dailyKcal.join(', ')}`}>
               {week.map((date, index) => (
                 <View key={date} style={styles.weekColumn}>
                   <View
@@ -199,6 +254,9 @@ export default function HomeScreen() {
               <AppText style={styles.rowFood} numberOfLines={1}>
                 {entry.foodText}
               </AppText>
+              <AppText style={styles.rowKcal}>
+                {entry.calories === null ? '—' : formatNumber(entry.calories)}
+              </AppText>
             </View>
           ))
         )}
@@ -242,6 +300,38 @@ const styles = StyleSheet.create({
   },
   heroUnit: {
     color: Colors.onAccentMuted,
+  },
+  heroNote: {
+    fontSize: 13,
+    color: Colors.onAccentMuted,
+  },
+  ring: {
+    width: RING_SIZE,
+    height: RING_SIZE,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ringText: {
+    position: 'absolute',
+    fontFamily: Fonts.bold,
+    fontSize: 20,
+    color: Colors.onAccent,
+  },
+  streakChip: {
+    minHeight: 32,
+    paddingHorizontal: 12,
+    borderRadius: Radius.pill,
+    backgroundColor: Colors.accentSoft,
+    justifyContent: 'center',
+  },
+  streakChipText: {
+    fontFamily: Fonts.bold,
+    fontSize: 12,
+    color: Colors.accent,
+  },
+  rowKcal: {
+    fontFamily: Fonts.bold,
+    fontSize: 14,
   },
   heroLink: {
     marginTop: Spacing.two,

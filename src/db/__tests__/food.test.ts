@@ -35,6 +35,7 @@ describe('food log', () => {
       foodText: '2 roti with ghee',
       quantity: null,
       calories: null,
+      calorieSource: null,
       createdAt: '2026-10-12T10:00:00.000Z',
       updatedAt: '2026-10-12T10:00:00.000Z',
     });

@@ -4,15 +4,17 @@ import { AppText } from './app-text';
 
 import { Colors, Fonts, Radius, Shadows } from '@/constants/theme';
 import { type FoodEntry } from '@/db/food';
+import { formatNumber } from '@/lib/format';
 
 export type FoodRowProps = {
   entry: FoodEntry;
   onPress: () => void;
 };
 
-/** One food item as a card: time chip, what was eaten, and the quantity if given. */
+/** One food item as a card: time chip, what was eaten, and its calories. */
 export function FoodRow({ entry, onPress }: FoodRowProps) {
   const timed = entry.eatenAt !== null;
+  const known = entry.calories !== null;
 
   return (
     <Pressable
@@ -34,6 +36,12 @@ export function FoodRow({ entry, onPress }: FoodRowProps) {
             {entry.quantity}
           </AppText>
         ) : null}
+      </View>
+      <View style={styles.calories}>
+        <AppText style={[styles.kcal, !known && styles.kcalMissing]}>
+          {known ? formatNumber(entry.calories!) : 'Add'}
+        </AppText>
+        <AppText type="label">kcal</AppText>
       </View>
     </Pressable>
   );
@@ -81,5 +89,16 @@ const styles = StyleSheet.create({
   },
   food: {
     fontFamily: Fonts.semiBold,
+  },
+  calories: {
+    alignItems: 'flex-end',
+  },
+  kcal: {
+    fontFamily: Fonts.bold,
+    fontSize: 16,
+    lineHeight: 20,
+  },
+  kcalMissing: {
+    color: Colors.accent,
   },
 });

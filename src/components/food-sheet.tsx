@@ -10,14 +10,23 @@ import { MealChips } from './meal-chips';
 import { Sheet } from './sheet';
 
 import { Fonts, Spacing } from '@/constants/theme';
-import { deleteFood, updateFood, type FoodEntry } from '@/db/food';
-import { useDb } from '@/db/provider';
+import { deleteFood, updateFood, type CalorieSource, type FoodEntry } from '@/db/food';
+import { estimateFor, rememberCalories } from '@/db/memory';
+import { useDb, useDbQuery } from '@/db/provider';
+import { describeEstimate } from '@/lib/calories';
 import { parseClockTime, type LogDate } from '@/lib/day';
 
 export type FoodSheetProps = {
   entry: FoodEntry;
   today: LogDate;
   onClose: () => void;
+};
+
+const SOURCE_NOTE: Record<CalorieSource, string> = {
+  list: 'Worked out from the food list',
+  memory: 'From a figure you gave before',
+  ai: 'From an AI app',
+  manual: 'Typed by you',
 };
 
 /** Edit or delete one food item. Mount it with `key={entry.id}` so each item starts fresh. */
@@ -28,18 +37,78 @@ export function FoodSheet({ entry, today, onClose }: FoodSheetProps) {
   const [time, setTime] = useState(entry.eatenAt ?? '');
   const [meal, setMeal] = useState(entry.meal);
   const [logDate, setLogDate] = useState(entry.logDate);
+  // Null until the calories field is typed in; until then it follows the food text.
+  const [typedCalories, setTypedCalories] = useState<string | null>(null);
   const [foodError, setFoodError] = useState<string | null>(null);
   const [timeError, setTimeError] = useState<string | null>(null);
+  const [caloriesError, setCaloriesError] = useState<string | null>(null);
+
+  const estimate = useDbQuery(`estimate:${foodText}`, (source) => estimateFor(source, foodText));
+  const textChanged = foodText.trim() !== entry.foodText;
+  // What the app would fill in by itself: the saved figure while the food is
+  // unchanged, otherwise a fresh estimate for the new text.
+  const automatic: { calories: number | null; source: CalorieSource | null } =
+    !textChanged && entry.calories !== null
+      ? { calories: entry.calories, source: entry.calorieSource }
+      : { calories: estimate?.total ?? null, source: estimate?.source ?? null };
+  const caloriesText =
+    typedCalories ?? (automatic.calories === null ? '' : String(automatic.calories));
+
+  const hint =
+    typedCalories !== null
+      ? 'Your figure will be remembered for this food'
+      : automatic.calories === null
+        ? estimate && estimate.parts.length > 0
+          ? `Not known: ${estimate.parts
+              .filter((part) => part.kcal === null)
+              .map((part) => part.label)
+              .join(', ')}. Type the calories, or use "Ask an AI app" on the Food screen.`
+          : 'Type the calories if you know them'
+        : automatic.source === 'list' && estimate && estimate.total !== null
+          ? `${SOURCE_NOTE.list}: ${describeEstimate(estimate)}`
+          : automatic.source
+            ? SOURCE_NOTE[automatic.source]
+            : undefined;
 
   const save = async () => {
     const eatenAt = time.trim() === '' ? null : parseClockTime(time);
     const badFood = foodText.trim() === '';
     const badTime = time.trim() !== '' && eatenAt === null;
+
+    let calories = automatic.calories;
+    let calorieSource = automatic.source;
+    let badCalories = false;
+    if (typedCalories !== null) {
+      const text = typedCalories.trim();
+      if (text === '') {
+        calories = null;
+        calorieSource = null;
+      } else if (/^\d{1,5}$/.test(text)) {
+        calories = Number(text);
+        calorieSource = 'manual';
+      } else {
+        badCalories = true;
+      }
+    }
+
     setFoodError(badFood ? 'Enter what you ate.' : null);
     setTimeError(badTime ? 'Enter a time like 08:30, or leave it empty.' : null);
-    if (badFood || badTime) return;
+    setCaloriesError(badCalories ? 'Enter a whole number, or leave it empty.' : null);
+    if (badFood || badTime || badCalories) return;
 
-    await updateFood(db, entry.id, { logDate, foodText, meal, quantity, eatenAt });
+    await updateFood(db, entry.id, {
+      logDate,
+      foodText,
+      meal,
+      quantity,
+      eatenAt,
+      calories,
+      calorieSource,
+    });
+    if (calorieSource === 'manual' && calories !== null) {
+      // Next time this food is typed, the app fills the figure in by itself.
+      await rememberCalories(db, foodText, calories);
+    }
     invalidate();
     onClose();
   };
@@ -67,7 +136,19 @@ export function FoodSheet({ entry, today, onClose }: FoodSheetProps) {
         error={foodError}
         returnKeyType="done"
       />
-      <View style={styles.mealField}>
+      <View style={styles.field}>
+        <Field
+          label="Calories (kcal)"
+          value={caloriesText}
+          onChangeText={setTypedCalories}
+          placeholder="Not known"
+          keyboardType="number-pad"
+          inputMode="numeric"
+          error={caloriesError}
+        />
+        {hint && !caloriesError ? <AppText type="caption">{hint}</AppText> : null}
+      </View>
+      <View style={styles.field}>
         <AppText type="caption" style={styles.label}>
           Meal (optional)
         </AppText>
@@ -103,7 +184,7 @@ export function FoodSheet({ entry, today, onClose }: FoodSheetProps) {
 }
 
 const styles = StyleSheet.create({
-  mealField: {
+  field: {
     gap: Spacing.two,
   },
   label: {

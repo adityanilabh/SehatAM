@@ -47,7 +47,7 @@ describe('meals on food items', () => {
   it('carries meals through export and import', async () => {
     await addFood(db, { logDate: DAY, foodText: 'dal rice', meal: 'lunch' });
     const backup = parseBackup(JSON.stringify(await exportData(db)));
-    expect(backup.formatVersion).toBe(2);
+    expect(backup.formatVersion).toBe(3);
 
     const fresh = await openAppTestDb();
     await importData(fresh, backup);
